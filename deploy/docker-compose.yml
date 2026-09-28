@@ -1,0 +1,112 @@
+# Production stack for the Jetson Orin Nano: frontend + backend behind one Caddy reverse proxy.
+#
+#   cp .env.example .env     # then fill in every required value
+#   docker compose up -d --build
+#
+# Only Caddy publishes a port. The browser reaches the frontend and the API on the same origin
+# (/api, /ws), so no CORS is involved. Cloudflare Tunnel (systemd on the host) points at
+# http://localhost:80, and LAN clients can open http://<jetson-ip> directly when the internet is down.
+#
+# Relative paths resolve from this directory: ".." is this backend repository, and the frontend
+# repository is expected next to it (override with FRONTEND_CONTEXT).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-smartmelon}
+      POSTGRES_USER: ${DATABASE_USERNAME:-smartmelon}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-smartmelon} -d ${POSTGRES_DB:-smartmelon}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No published port: only the backend talks to the database.
+    # For maintenance use: docker compose exec postgres psql -U smartmelon smartmelon
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      # Loopback only, for the edge agent running on the host. Never reachable from the LAN.
+      - "127.0.0.1:${MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: jetson
+
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smartmelon}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-smartmelon}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}
+
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_ISSUER: ${JWT_ISSUER:-smartmelon-backend}
+
+      # Every origin a browser may open the dashboard from (tunnel hostname and LAN address).
+      FRONTEND_URL: ${PUBLIC_ORIGINS:?PUBLIC_ORIGINS is required}
+      WEBSOCKET_ALLOWED_ORIGINS: ${PUBLIC_ORIGINS:?PUBLIC_ORIGINS is required}
+
+      MQTT_ENABLED: "true"
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+
+      BOOTSTRAP_OPERATOR_USERNAME: ${BOOTSTRAP_OPERATOR_USERNAME:-operator}
+      BOOTSTRAP_OPERATOR_PASSWORD: ${BOOTSTRAP_OPERATOR_PASSWORD:?BOOTSTRAP_OPERATOR_PASSWORD is required}
+      BOOTSTRAP_OPERATOR_FULL_NAME: ${BOOTSTRAP_OPERATOR_FULL_NAME:-Field Operator}
+
+      LOG_LEVEL_APP: ${LOG_LEVEL_APP:-INFO}
+      JAVA_OPTS: -XX:MaxRAMPercentage=75.0
+    # The 8 GB are shared with inference; the JVM heap follows this limit.
+    mem_limit: ${BACKEND_MEM_LIMIT:-1g}
+
+  frontend:
+    build:
+      context: ${FRONTEND_CONTEXT:-../../FE_FeriMata}
+      args:
+        # Empty base URL: the browser calls /api and /ws on whatever host served the page.
+        NEXT_PUBLIC_API_BASE_URL: ""
+        NEXT_PUBLIC_SITE_NAME: ${SITE_NAME:-Greenhouse Melon}
+        NEXT_PUBLIC_SITE_LOCATION: ${SITE_LOCATION:-}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    mem_limit: ${FRONTEND_MEM_LIMIT:-512m}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      # All interfaces: cloudflared on the host and LAN clients both come in here.
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+  mosquitto-data:
+  caddy-data:
+  caddy-config:

@@ -6,6 +6,7 @@ target/
 .env.*
 !.env.example
 docs/
+deploy/
 *.md
 docker/mosquitto/data/
 docker/mosquitto/log/

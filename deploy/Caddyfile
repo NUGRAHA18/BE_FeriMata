@@ -1,0 +1,26 @@
+# One origin for the dashboard: the frontend at /, the backend at /api, /ws and the health check.
+#
+# Plain HTTP on :80 on purpose. Cloudflare terminates TLS for the tunnel hostname, and LAN clients
+# use http://<jetson-ip>, so Caddy never needs a certificate.
+
+{
+	# cloudflared sends X-Forwarded-Proto: https. Trust X-Forwarded-* only from local and private
+	# addresses (the host and the Docker bridge), so the backend sees the real scheme.
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:80 {
+	encode gzip
+
+	@backend path /api/* /ws /ws/* /actuator/health /actuator/health/*
+	handle @backend {
+		# WebSocket upgrades are proxied automatically.
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
