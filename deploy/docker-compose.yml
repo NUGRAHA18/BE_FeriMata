@@ -49,7 +49,11 @@ services:
       mosquitto:
         condition: service_started
     environment:
-      SPRING_PROFILES_ACTIVE: jetson
+      # jetson = real hardware. dev = telemetry simulator + /api/dev tools, for work without hardware;
+      # never while the edge agent is publishing, or simulated and real data are mixed.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-jetson}
+      DEV_SIMULATOR_ENABLED: ${DEV_SIMULATOR_ENABLED:-true}
+      DEV_SIMULATOR_INTERVAL: ${DEV_SIMULATOR_INTERVAL:-10s}
 
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smartmelon}
       DATABASE_USERNAME: ${DATABASE_USERNAME:-smartmelon}
