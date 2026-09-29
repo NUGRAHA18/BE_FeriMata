@@ -25,8 +25,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # No published port: only the backend talks to the database.
-    # For maintenance use: docker compose exec postgres psql -U smartmelon smartmelon
+    ports:
+      # Loopback only, for pgAdmin/psql over an SSH tunnel. Never reachable from the LAN or tailnet.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-15432}:5432"
 
   mosquitto:
     image: eclipse-mosquitto:2
