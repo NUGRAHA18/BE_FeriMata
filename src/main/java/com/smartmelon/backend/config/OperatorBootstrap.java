@@ -13,12 +13,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Creates the first operator account so a fresh deployment can be signed in to.
+ * Bikin akun operator pertama supaya deployment baru bisa dipakai buat sign in.
  *
- * <p>It runs only when the user table is empty, so it can never overwrite a password that an
- * operator has since changed, and it refuses to run without a password from the environment rather
- * than falling back to a default one.
+ * <p>Fungsi ini cuma jalan pas tabel user masih kosong, jadi gak bakal pernah numpuk password yang
+ * udah diubah sama operator. Selain itu, fungsi ini bakal nolak jalan kalo gak ada password yang
+ * diset lewat environment variable.
  */
+
 @Component
 @ConditionalOnProperty(prefix = "app.bootstrap", name = "enabled", havingValue = "true")
 public class OperatorBootstrap implements ApplicationRunner {
@@ -55,7 +56,6 @@ public class OperatorBootstrap implements ApplicationRunner {
         User user = new User(
                 username, passwordEncoder.encode(password), properties.operatorFullName(), Role.OPERATOR);
         userRepository.save(user);
-        // The username is safe to log; the password is not, and never appears in any log statement.
         log.warn("Created the initial OPERATOR account '{}'. Change its password after the first sign-in.", username);
     }
 }

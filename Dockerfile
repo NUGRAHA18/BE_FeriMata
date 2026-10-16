@@ -1,5 +1,3 @@
-# Build stage -----------------------------------------------------------------
-# The Maven wrapper is used so the image builds with exactly the Maven version the project pins.
 FROM eclipse-temurin:17-jdk AS build
 WORKDIR /workspace
 
@@ -11,7 +9,7 @@ RUN chmod +x mvnw && ./mvnw -B -q dependency:go-offline
 COPY src/ src/
 RUN ./mvnw -B -q -DskipTests package
 
-# Runtime stage ---------------------------------------------------------------
+# Runtime stage 
 FROM eclipse-temurin:17-jre AS runtime
 WORKDIR /app
 

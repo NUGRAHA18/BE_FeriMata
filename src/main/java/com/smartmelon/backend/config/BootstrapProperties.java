@@ -3,13 +3,11 @@ package com.smartmelon.backend.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * First-run account creation.
+* Pembuatan akun saat pertama kali aplikasi dijalankan.
+* Data login diambil langsung dari environment, cuma dipakai sekali pas tabel user masih kosong, dan
+* tidak pernah dicatat ke log sama sekali.
  *
- * <p>Deliberately not a database migration: a migration would commit a password to version control.
- * The credentials come from the environment, are used once when the user table is empty, and are
- * never logged.
- *
- * @param enabled whether to create the first operator when no account exists
+ * @param enabled status aktif untuk buat akun operator pertama pas belum ada akun sama sekali
  */
 @ConfigurationProperties(prefix = "app.bootstrap")
 public record BootstrapProperties(boolean enabled, String operatorUsername, String operatorPassword,

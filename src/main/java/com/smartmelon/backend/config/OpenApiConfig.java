@@ -9,7 +9,7 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** OpenAPI document metadata and the bearer-token security scheme used across the API. */
+/** Metadata dokumen OpenAPI serta skema keamanan bearer-token yang digunakan di seluruh API.*/
 @Configuration
 public class OpenApiConfig {
 

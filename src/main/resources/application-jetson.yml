@@ -1,39 +1,38 @@
-# JETSON profile: the FERTIMATA Rev A deployment. Activate with SPRING_PROFILES_ACTIVE=jetson.
+# Profile JETSON: deployment FERTIMATA Rev A. Aktifin dengan SPRING_PROFILES_ACTIVE=jetson.
 #
-# Everything runs on one Jetson Orin Nano 8GB: frontend, this backend, PostgreSQL, the vision model
-# and the edge agent that speaks Modbus/GPIO. The settings below reflect that - a local broker, a
-# small connection pool, and stricter command handling because the actuators are real.
+# Semuanya jalan di satu Jetson Orin Nano 8GB: frontend, backend ini, PostgreSQL, model vision,
+# sama edge agent yang ngomong Modbus/GPIO. Setting di bawah ini disesuaiin sama itu - broker lokal,
+# connection pool kecil, sama penanganan command yang lebih ketat karena actuator-nya beneran.
 #
-# It is still PRODUCTION mode: JWT_SECRET and the operator password have no defaults here either.
+# Tetep mode PRODUCTION: JWT_SECRET sama password operator-nya juga nggak punya default di sini.
 
 spring:
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://127.0.0.1:5432/smartmelon}
     hikari:
-      # The database shares 8 GB with inference; a small pool is plenty for one site.
       maximum-pool-size: ${DATABASE_POOL_SIZE:5}
 
 server:
-  # The dashboard is reached through Cloudflare Tunnel; honour X-Forwarded-* from the local proxy.
+  # Dashboard diakses lewat Cloudflare Tunnel; hormati X-Forwarded-* dari proxy lokal.
   forward-headers-strategy: framework
 
 app:
   device:
-    # The catalog provisions every device. An unknown device code is a misconfigured agent, not a
-    # new greenhouse, so its messages are recorded as REJECTED rather than inventing a device.
+    # Katalog yang nge-provision semua device. Kode device yang nggak dikenal artinya agent-nya
+    # salah konfigurasi, bukan greenhouse baru, jadi pesannya dicatat sebagai REJECTED, bukan bikin device baru.
     auto-register: ${DEVICE_AUTO_REGISTER:false}
 
   telemetry:
-    # Still on: an unknown metric becomes a disabled placeholder sensor, so data is kept for review.
+    # Masih nyala: metric yang nggak dikenal jadi sensor placeholder (disabled), biar datanya tetap ke-simpan buat ditinjau.
     auto-register-sensors: ${TELEMETRY_AUTO_REGISTER_SENSORS:true}
 
   actuator:
     safety:
-      # A persistent MQTT session would otherwise deliver a queued "ON" whenever a device returns.
+      # Session MQTT yang persistent bisa aja nganterin perintah "ON" yang ngantri begitu device nyala lagi.
       refuse-when-device-offline: ${ACTUATOR_REFUSE_WHEN_DEVICE_OFFLINE:true}
       command-ttl: ${ACTUATOR_COMMAND_TTL:30s}
 
   mqtt:
     enabled: ${MQTT_ENABLED:true}
-    # Mosquitto on the same board, bound to loopback only. Nothing outside the Jetson needs MQTT.
+    # Mosquitto di board yang sama, cuma di-bind ke loopback. Yang di luar Jetson nggak perlu MQTT.
     broker-url: ${MQTT_BROKER_URL:tcp://127.0.0.1:1883}

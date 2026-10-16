@@ -8,12 +8,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * JWT signing settings.
+ * Pengaturan penandatanganan token JWT.
  *
- * <p>The secret has no default and must be supplied through the environment (JWT_SECRET). Startup
- * fails rather than falling back to a built-in value, because a shipped default secret is the same
- * as no authentication at all. HS256 requires at least 256 bits of key material.
+ * <p>Nilai kunci rahasia (secret) tidak memiliki nilai bawaan dan wajib disediakan melalui
+ * lingkungan ({@code JWT_SECRET}). Proses inisialisasi aplikasi akan sengaja digagalkan daripada
+ * menggunakan nilai bawaan, karena kunci rahasia bawaan memiliki tingkat keamanan yang setara
+ * dengan tanpa autentikasi sama sekali. Algoritma HS256 membutuhkan materi kunci sekurang-kurangnya 256 bit.
  */
+
 @Validated
 @ConfigurationProperties(prefix = "app.security.jwt")
 public record JwtProperties(

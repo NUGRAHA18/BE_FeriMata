@@ -3,7 +3,7 @@ package com.smartmelon.backend.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
-/** Enables the created/updated timestamp auditing used by the entity base classes. */
+/** aktifkan fitur timestamp auditing (created/updated) otomatis yang digunakan oleh entity base class.*/
 @Configuration
 @EnableJpaAuditing
 public class JpaConfig {}

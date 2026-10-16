@@ -1,4 +1,4 @@
-# Smart Melon — Backend
+# FertiMata — Backend
 
 Backend for **Smart Melon**, a smart-agriculture / IoT system for monitoring and controlling melon
 cultivation. This repository is the **phase 1 foundation**: a production-quality Spring Boot
@@ -168,8 +168,6 @@ and `.env.example` documents every variable.
 | `ACTUATOR_REFUSE_WHEN_DEVICE_OFFLINE` | `false` (`true` under `jetson`) | Refuse activating commands for a device that is not ONLINE |
 | `ACTUATOR_COMMAND_TTL` | empty (`30s` under `jetson`, `60s` under `dev`) | Adds `expiresAt` to commands; the edge agent discards late ones |
 
-See [docs/hasil-penyesuaian-1.md](docs/hasil-penyesuaian-1.md) for how the FERTIMATA Rev A hardware
-maps onto devices, metric keys, actuator types and interlocks.
 | `TELEMETRY_AUTO_REGISTER_SENSORS` | `true` | Create a disabled sensor for an unknown metric |
 | `TELEMETRY_MAX_CLOCK_SKEW_SECONDS` | `300` | Guards against an unsynced device clock |
 | `TELEMETRY_MAX_METRICS_PER_MESSAGE` | `64` | |

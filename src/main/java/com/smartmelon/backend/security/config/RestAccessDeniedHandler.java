@@ -11,7 +11,10 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
-/** Responds to authenticated requests that lack the required role. */
+/**
+ * Merespons permintaan terautentikasi yang tidak memiliki peran (<i>role</i>) yang dibutuhkan.
+ * */
+
 @Component
 public class RestAccessDeniedHandler implements AccessDeniedHandler {
 
@@ -24,8 +27,11 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
     }
 
     @Override
-    public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
-            throws IOException {
+    public void handle(
+        HttpServletRequest request, 
+        HttpServletResponse response, 
+        AccessDeniedException ex
+    ) throws IOException {
         log.warn("Access denied for {} {}", request.getMethod(), request.getRequestURI());
         writer.write(
                 request,

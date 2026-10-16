@@ -11,7 +11,10 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
-/** Responds to requests that carry no token, or a token that failed verification. */
+/**
+ * Merespons permintaan yang tidak menyertakan token atau menggunakan token yang gagal diverifikasi.
+ */
+
 @Component
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
@@ -24,8 +27,11 @@ public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {
     }
 
     @Override
-    public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
-            throws IOException {
+    public void commence(
+        HttpServletRequest request, 
+        HttpServletResponse response, 
+        AuthenticationException ex
+    ) throws IOException {
         log.warn("Rejected unauthenticated request to {} {}", request.getMethod(), request.getRequestURI());
         writer.write(
                 request,

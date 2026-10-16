@@ -6,11 +6,11 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * The single error shape returned by every endpoint.
+ * Format error tunggal yang dipakai semua endpoint.
  *
- * <p>Stack traces are never included: {@code message} is a safe, human-readable summary and
- * {@code details} carries field-level information for validation failures only.
+ * <p>Tanpa stack trace: {@code message} cuma ringkasan aman yang gampang dibaca, {@code details} khusus nampung info error validasi di tingkat field.
  */
+
 @Schema(name = "ApiError", description = "Standard error response")
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record ApiError(
@@ -21,7 +21,13 @@ public record ApiError(
         @Schema(example = "/api/actuators/1/commands") String path,
         @Schema(description = "Field-level details, present for validation errors") Map<String, Object> details) {
 
-    public static ApiError of(int status, String error, String message, String path, Map<String, Object> details) {
+    public static ApiError of(
+        int status, 
+        String error, 
+        String message, 
+        String path, 
+        Map<String, Object> details
+    ) {
         return new ApiError(Instant.now(), status, error, message, path, details == null ? Map.of() : details);
     }
 }

@@ -1,20 +1,18 @@
-# FERTIMATA Rev A - hardware catalog and interlock policy.
+# FERTIMATA Rev A - katalog hardware dan kebijakan interlock.
 #
-# Source: docs/Arsitektur-Sistem.md (17 September 2026). Adjustment report: docs/hasil-penyesuaian-1.md.
+# Berkas ini adalah SATU-SATUNYA tempat backend kenal revisi hardware ini. Kalo ada revisi beda,
+# atau perbaikan pas part-nya nyampe, tinggal edit di sini (atau bikin salinan yang ditunjuk sama
+# HARDWARE_CATALOG_LOCATION) — gak perlu ubah kode Java sama sekali.
 #
-# This file is the ONLY place the backend learns about this hardware revision. A different revision,
-# or a correction after the parts arrive, is an edit here (or a copy pointed to by
-# HARDWARE_CATALOG_LOCATION) - never a Java change.
+# Berkas ini BUKAN: peta wiring (pemasangan kabel). Alamat Modbus, channel relay, dan pin GPIO di bawah
+# `metadata` cuma salinan informasi buat operator console. Edge agent di Jetson yang megang
+# peta alamat utamanya (Arsitektur-Sistem.md §3: "Peta alamat di satu berkas konfigurasi").
 #
-# What this file is NOT: the wiring map. Modbus addresses, relay channels and GPIO pins under
-# `metadata` are informational copies for the operator console. The edge agent on the Jetson keeps
-# the authoritative address map (Arsitektur-Sistem.md §3: "Peta alamat di satu berkas konfigurasi").
+# Kode device ngikutin fault domain, jadi console bisa ngebedain "kabel I/O remote putus" sama
+# "Jetson-nya mati/down": tiap device bakal jalan OFFLINE sendiri-sendiri pas edge agent gak dapet respon lagi.
 #
-# Device codes follow fault domains, so the console can tell "the remote I/O cable is cut" apart from
-# "the Jetson is down": each device goes OFFLINE on its own when the edge agent stops hearing from it.
-#
-# Sync is create-only: rows that already exist are never changed by a restart. Edit them through the
-# API (PATCH /api/sensors/{id}, PATCH /api/actuators/{id}) instead.
+# Sync sifatnya create-only: baris yang udah ada gak bakal pernah berubah cuma gara-gara restart. Edit baris itu
+# lewat API (PATCH /api/sensors/{id}, PATCH /api/actuators/{id}) sebagai gantinya.
 
 app:
   catalog:
@@ -25,7 +23,7 @@ app:
       - code: JETSON-01
         name: Jetson Orin Nano (otak sistem)
         type: EDGE_GATEWAY
-        description: Satu-satunya komputer. Menjalankan frontend, backend, database, inferensi dan edge agent.
+        description: Komputer yang menjalankan frontend, backend, database, inferensi dan edge agent.
         metadata:
           location: Panel box, luar greenhouse sisi selatan
           os: JetPack 6 / Ubuntu 22.04

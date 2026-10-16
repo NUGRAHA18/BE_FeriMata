@@ -4,15 +4,16 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Telemetry ingestion policy.
+ * Kebijakan ingestion telemetri.
  *
- * @param autoRegisterSensors when true, a metric arriving for an unknown sensor creates a disabled
- *     placeholder sensor row instead of being dropped. This keeps data from being lost while the
- *     hardware team is still changing the sensor set; an operator can then name and enable it.
- * @param maxClockSkew how far into the future a device-supplied timestamp may be before it is
- *     replaced by the server receive time. Protects against edge devices with an unsynced clock.
- * @param maxMetricsPerMessage guard against a malformed or hostile payload exploding into rows.
+ * @param autoRegisterSensors kalo nilainya true, metrik yang masuk dari sensor yang gak dikenal bakal bikin
+ *     baris placeholder sensor berstatus disabled, bukannya langsung dibuang. Ini ngejaga biar data gak hilang
+ *     pas tim hardware masih gonta-ganti set sensor; operator tinggal namain sama aktifin sensornya nanti.
+ * @param maxClockSkew seberapa jauh timestamp dari device boleh mendahului waktu server sebelum akhirnya diganti
+ *     pakai server receive time. Ini buat nahan device edge yang jamnya gak tersinkron.
+ * @param maxMetricsPerMessage guard biar payload yang cacat atau berniat jahat gak meledak jadi berbaris-baris data.
  */
+
 @ConfigurationProperties(prefix = "app.telemetry")
 public record TelemetryProperties(
         boolean autoRegisterSensors, Duration maxClockSkew, int maxMetricsPerMessage) {}

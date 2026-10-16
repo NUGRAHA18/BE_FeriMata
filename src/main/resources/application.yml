@@ -1,21 +1,17 @@
-# Default configuration. Safe for production: every secret comes from the environment and has no
-# fallback, so the application fails fast rather than starting with a shipped default.
+# Default configuration
 spring:
   application:
     name: smartmelon-backend
 
-  # Local convenience: a .env file in the project root is imported when present. It is gitignored.
-  # The hardware catalog describes the devices, sensors, actuators and interlocks of one hardware
-  # revision. Point HARDWARE_CATALOG_LOCATION (an environment variable, not a .env entry) at another
-  # file to run different hardware without a code change.
+  # Katalog hardware ini ngejelasin device, sensor, sama actuator-nya
+  # Arahkan HARDWARE_CATALOG_LOCATION (ini environment variable, bukan entry di .env)
+  # ke file lain biar bisa jalanin hardware beda tanpa ubah kode.  
   config:
     import:
       - "optional:file:./.env[.properties]"
       - "optional:${HARDWARE_CATALOG_LOCATION:classpath:hardware/fertimata-rev-a.yml}"
 
   datasource:
-    # DATABASE_* is the documented name. SPRING_DATASOURCE_* also works and wins if both are set,
-    # because Spring binds it to the same property at a higher precedence.
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/smartmelon}
     username: ${DATABASE_USERNAME:smartmelon}
     password: ${DATABASE_PASSWORD:}
@@ -25,7 +21,7 @@ spring:
   jpa:
     open-in-view: false
     hibernate:
-      # The schema belongs to Flyway. Hibernate only verifies that it matches the entities.
+    # Schema-nya milik Flyway. Hibernate cuma ngecek apakah cocok sama entity-nya.
       ddl-auto: validate
     properties:
       hibernate:
@@ -38,16 +34,15 @@ spring:
     locations: classpath:db/migration
 
   jackson:
-    # Nulls are serialised explicitly. A field that is absent and a field that is null look the
-    # same to a client otherwise, and several fields are meaningfully null - an actuator with no
-    # reported state yet, a command that has not been executed. ApiError opts out separately so an
-    # empty validation-details map is not rendered.
+  # Null bakalan di-serialisasi secara eksplisit. Kalau nggak, field yang nggak ada sama field yang null 
+  # bakalan kelihatan sama di sisi client. Padahal beberapa field emang sengaja null - misalnya actuator
+  # yang belum ada state-nya, atau command yang belum dieksekusi. ApiError ngatur sendiri biar
+  # map validation-details yang kosong nggak ikut dirender.
     default-property-inclusion: always
 
 server:
   port: ${SERVER_PORT:8080}
   error:
-    # Errors are rendered by GlobalExceptionHandler; never leak a stack trace to a client.
     include-stacktrace: never
     include-message: never
 
@@ -67,7 +62,7 @@ springdoc:
     tags-sorter: alpha
 
 app:
-  # DEVELOPMENT wires the mock transport and the simulator. Never set it in a deployed environment.
+  # DEVELOPMENT nyalain mock transport sama simulator. Jangan pernah diaktifin di environment yang udah di-deploy.
   mode: ${APP_MODE:PRODUCTION}
 
   bootstrap:
@@ -77,22 +72,22 @@ app:
     operator-full-name: ${BOOTSTRAP_OPERATOR_FULL_NAME:Operator}
 
   device:
-    # TODO(hardware): provisional. Set to a small multiple of the real heartbeat interval once the
-    # edge device firmware decides on one.
+  # TODO(hardware): masih sementara. Nanti ganti jadi kelipatan kecil dari interval heartbeat aslinya
+  # begitu firmware edge device-nya udah fix interval-nya.
     offline-timeout: ${DEVICE_OFFLINE_TIMEOUT_SECONDS:120}s
     liveness-check-interval: ${DEVICE_LIVENESS_CHECK_INTERVAL_SECONDS:30}s
     auto-register: ${DEVICE_AUTO_REGISTER:true}
 
   catalog:
-    # Create-only sync of the imported hardware catalog at startup. Existing rows are never modified.
+    # Sync katalog hardware yang di-import cuma buat create aja saat startup. Row yang udah ada nggak bakal diubah.
     enabled: ${HARDWARE_CATALOG_SYNC:true}
 
   actuator:
     safety:
-      # Interlock lists (timed-types, blocked-on-backup-power-types, exclusive-type-groups) come from
-      # the hardware catalog file. These two are deployment choices rather than hardware facts.
+      # List interlock (timed-types, blocked-on-backup-power-types, exclusive-type-groups) berasal dari
+      # file katalog hardware. Dua yang ini lebih ke pilihan deployment, bukan fakta hardware.
       refuse-when-device-offline: ${ACTUATOR_REFUSE_WHEN_DEVICE_OFFLINE:false}
-      # Wire expiry for commands; the edge agent discards anything older. Unset means no expiry field.
+      # Batas waktu (expiry) buat command di kabel; edge agent bakalan buang yang udah kadaluarsa. Kalau nggak diisi berarti nggak ada field expiry-nya.
       command-ttl: ${ACTUATOR_COMMAND_TTL:}
 
   telemetry:
@@ -102,7 +97,7 @@ app:
 
   security:
     jwt:
-      # No default on purpose: a shipped signing secret is the same as no authentication.
+      # Sengaja nggak dikasih default: secret buat signing yang udah ikut di-ship sama aja artinya nggak ada authentication.
       secret: ${JWT_SECRET}
       issuer: ${JWT_ISSUER:smartmelon-backend}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL_MINUTES:60}m
@@ -130,9 +125,9 @@ app:
     completion-timeout: 30s
     clean-start: false
     automatic-reconnect: true
-    # PROVISIONAL topic convention. The naming is not locked with the hardware team; every topic in
-    # the system is built from these templates, so changing them here changes them everywhere.
-    # {deviceId} is replaced with the device code.
+    # Konvensi topik SEMENTARA. Naming-nya belum final sama tim hardware; semua topik di sistem ini
+    # dibangun dari template-template ini, jadi ubah di sini aja bakal ngubah semuanya.
+    # {deviceId} bakalan diganti sama kode device-nya.
     topics:
       telemetry: ${MQTT_TOPIC_TELEMETRY:smartmelon/{deviceId}/telemetry}
       status: ${MQTT_TOPIC_STATUS:smartmelon/{deviceId}/status}

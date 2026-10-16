@@ -2,7 +2,7 @@ package com.smartmelon.backend.common.exception;
 
 import org.springframework.http.HttpStatus;
 
-/** Stable, machine-readable error identifiers returned in the {@code error} field of an API error. */
+/** Identifier error yang stabil dan machine-readable, dikembalikan di field {@code error} pada error API. */
 public enum ErrorCode {
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST),
     MALFORMED_REQUEST(HttpStatus.BAD_REQUEST),

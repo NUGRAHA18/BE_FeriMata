@@ -6,16 +6,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Device liveness and registration policy.
+ * Mengatur policy untuk liveness dan registrasi device.
  *
- * @param offlineTimeout how long silence is tolerated before a device is considered offline.
- *     Timeout-based detection is used deliberately: a device that loses power never gets to announce
- *     that it went away. TODO(hardware): must be a small multiple of the heartbeat interval the edge
- *     device will actually use, which is not decided yet - the shipped default is provisional.
- * @param livenessCheckInterval how often the backend re-evaluates which devices have gone quiet
- * @param autoRegister when true, a message from an unknown device code creates a device row instead
- *     of being dropped. Convenient while hardware is being bench-tested; consider turning it off in
- *     production so that only provisioned devices can create records.
+ * @param offlineTimeout batas waktu device boleh tidak mengirim heartbeat.
+ *        Kalau sudah melewati batas ini tanpa ada heartbeat, device dianggap OFFLINE.
+ *        Deteksi ini sengaja menggunakan timeout karena kalau device mati atau kehilangan power,
+ *        device tidak sempat mengirim pesan bahwa dirinya sudah offline.
+ *        TODO(hardware): nilainya sebaiknya dibuat beberapa kali dari heartbeat interval
+ *        yang benar-benar digunakan oleh edge device.
+ *
+ * @param livenessCheckInterval seberapa sering backend mengecek status device.
+ *
+ * @param autoRegister jika true, device yang belum dikenal akan otomatis didaftarkan.
+ *        Cocok untuk testing, tapi sebaiknya false di production.
  */
 @Validated
 @ConfigurationProperties(prefix = "app.device")

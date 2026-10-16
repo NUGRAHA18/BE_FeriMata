@@ -5,11 +5,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Top-level application settings.
+ * Konfigurasi utama aplikasi. 
  *
- * <p>{@link Mode#DEVELOPMENT} is what allows the backend to run without any hardware attached: mock
- * messaging and the telemetry simulator are only wired in that mode. Nothing in the business layer
- * branches on this value - the mode selects which infrastructure beans are created.
+ * di mana mock messaging dan simulator telementri hanya aktif pada mode tersebut. 
+ * Nilai ini tidak mengontrol logika bisnis, melainkan menentukan bean infrastruktur yang dibuat
  */
 @Validated
 @ConfigurationProperties(prefix = "app")

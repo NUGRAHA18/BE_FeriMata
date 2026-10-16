@@ -1,16 +1,9 @@
 # DEVELOPMENT profile. Activate with SPRING_PROFILES_ACTIVE=dev.
-#
-# This profile is what lets the backend run with no broker, no Jetson and no sensors attached, so
-# the frontend can be built against a real API before hardware integration is finished.
-#
-# Devices, sensors and actuators come from the hardware catalog (hardware/fertimata-rev-a.yml), the
-# same one the Jetson uses. Only the simulator ranges below are development placeholders: they keep
-# the dashboard moving, carry no agronomic meaning, and the backend never interprets them.
+
 app:
   mode: DEVELOPMENT
-
-  # Development-only credentials. Override them with BOOTSTRAP_OPERATOR_* in your .env file.
-  # The production profile has no default password at all.
+  
+  # Kredensial cuma buat development. Bisa di-override pake BOOTSTRAP_OPERATOR_* di file .env.
   bootstrap:
     enabled: true
     operator-username: ${BOOTSTRAP_OPERATOR_USERNAME:operator}
@@ -19,32 +12,32 @@ app:
 
   security:
     jwt:
-      # Development-only signing key. Never reuse it anywhere a real token matters.
       secret: ${JWT_SECRET:dev-only-secret-key-change-me-in-every-real-environment}
 
   websocket:
-    # Leave authentication on so the frontend wires up the same CONNECT headers it will need later.
-    # Set WEBSOCKET_REQUIRE_AUTHENTICATION=false only if you are debugging the transport itself.
+  # Biarin authentication-nya nyala biar frontend-nya pakai CONNECT header yang sama kayak nanti di production.
+  # WEBSOCKET_REQUIRE_AUTHENTICATION=false cuma boleh dipake kalau lagi debug transport-nya aja.
     require-authentication: ${WEBSOCKET_REQUIRE_AUTHENTICATION:true}
 
   mqtt:
-    # false selects the in-memory loopback transport instead of a broker connection.
-    # Set MQTT_ENABLED=true to test against the Mosquitto container from docker-compose.
+  # Kalau false, bakalan pakai in-memory loopback transport, bukan koneksi ke broker.
+  # Set MQTT_ENABLED=true kalau mau test pakai container Mosquitto dari docker-compose.
     enabled: ${MQTT_ENABLED:false}
 
   actuator:
     safety:
-      # Visible in /api/dev/outbox so the edge-agent developer sees the field they must honour.
+    # Keliatan di /api/dev/outbox biar developer edge-agent-nya bisa lihat field yang harus mereka hormati.
       command-ttl: ${ACTUATOR_COMMAND_TTL:60s}
 
   dev:
     simulator:
       enabled: ${DEV_SIMULATOR_ENABLED:true}
       interval: ${DEV_SIMULATOR_INTERVAL:10s}
-      # PLACEHOLDER ranges for rendering only. Device codes and metric keys match the catalog.
+      
+      # Range PLACEHOLDER cuma buat rendering aja. Kode device sama key metric-nya ngikutin katalog.
       devices:
         - code: JETSON-01
-          # Change to BATTERY through POST /api/dev/devices/JETSON-01/status to exercise the outage path.
+        # Ganti jadi BATTERY lewat POST /api/dev/devices/JETSON-01/status buat nyoba jalur outage-nya.
           power-source: MAINS
           metrics:
             - { key: trolley.station, min: 0, max: 0, scale: 0 }

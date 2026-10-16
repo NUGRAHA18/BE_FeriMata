@@ -36,21 +36,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-/**
- * Web security for a stateless JSON API.
- *
- * <p>Design notes worth knowing before changing anything here:
- *
- * <ul>
- *   <li><b>No custom JWT filter.</b> Token verification is delegated to Spring Security's
- *       resource-server support, so signature, issuer and expiry checks are framework code rather
- *       than hand-written code. {@code JwtRoleConverter} is the only custom piece.
- *   <li><b>CSRF is disabled.</b> The API holds no session and no auth cookie; the token travels in
- *       the {@code Authorization} header, which a cross-site form cannot set.
- *   <li><b>API docs are public only in development.</b> In production the OpenAPI document and
- *       Swagger UI require authentication, because they describe every endpoint in the system.
- * </ul>
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
@@ -85,8 +70,8 @@ public class SecurityConfig {
                     requests.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll();
                     requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info")
                             .permitAll();
-                    // The STOMP handshake is public; the CONNECT frame itself is authenticated by
-                    // WebSocketAuthenticationInterceptor, which can read the token from the frame.
+                 // Handshake STOMP bersifat publik; frame CONNECT itu sendiri diotentikasi oleh
+                 // WebSocketAuthenticationInterceptor, yang dapat membaca token dari frame tersebut.
                     requests.requestMatchers("/ws", "/ws/**").permitAll();
                     if (appProperties.isDevelopment()) {
                         requests.requestMatchers(DOCS_PATHS).permitAll();
@@ -94,18 +79,19 @@ public class SecurityConfig {
                     requests.anyRequest().authenticated();
                 })
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)
-                                .jwtAuthenticationConverter(jwtAuthenticationConverter()))
-                        .authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(accessDeniedHandler))
+                .jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                .authenticationEntryPoint(authenticationEntryPoint)
+                .accessDeniedHandler(accessDeniedHandler))
                 .exceptionHandling(handling -> handling.authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(accessDeniedHandler));
+                .accessDeniedHandler(accessDeniedHandler));
 
         return http.build();
     }
 
-    /**
-     * BCrypt with the library default cost. Chosen over a delegating encoder because there is no
-     * legacy password format to migrate from, and a single format keeps stored hashes predictable.
+   /**
+     * BCrypt dengan faktor beban (<i>cost factor</i>) bawaan dari pustaka. Dipilih dibandingkan 
+     * <i>delegating encoder</i> karena tidak ada format kata sandi terwariskan (<i>legacy</i>) yang perlu 
+     * dimigrasi, serta penggunaan format tunggal menjaga konsistensi nilai <i>hash</i> yang tersimpan.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -114,13 +100,15 @@ public class SecurityConfig {
 
     @Bean
     public AuthenticationManager authenticationManager(
-            UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
-        provider.setPasswordEncoder(passwordEncoder);
-        // Keeps the failure indistinguishable between "no such account" and "wrong password".
-        provider.setHideUserNotFoundExceptions(true);
-        return new ProviderManager(provider);
-    }
+            UserDetailsService userDetailsService, 
+            PasswordEncoder passwordEncoder
+        ) {
+            DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
+            provider.setPasswordEncoder(passwordEncoder);
+            // Keeps the failure indistinguishable between "no such account" and "wrong password".
+            // provider.setHideUserNotFoundExceptions(true);
+            return new ProviderManager(provider);
+        }
 
     @Bean
     public SecretKey jwtSigningKey() {

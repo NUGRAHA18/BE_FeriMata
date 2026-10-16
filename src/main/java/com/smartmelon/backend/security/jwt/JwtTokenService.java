@@ -12,12 +12,14 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Service;
 
 /**
- * Issues signed access tokens.
+ * Menerbitkan token akses yang ditandatangani.
  *
- * <p>Validation is not implemented here on purpose: Spring Security's resource-server support
- * verifies the signature, issuer and expiry of every incoming token before a request reaches a
- * controller. This class only has to mint them.
+ * <p>Proses validasi sengaja tidak diimplementasikan di sini: dukungan <i>resource server</i> pada 
+ * Spring Security telah memverifikasi tanda tangan, pembuat (<i>issuer</i>), dan masa berlaku (<i>expiry</i>) 
+ * dari setiap token yang masuk sebelum permintaan mencapai pengontrol (<i>controller</i>). Kelas ini 
+ * hanya bertugas untuk mencetak (<i>mint</i>) token tersebut.
  */
+
 @Service
 public class JwtTokenService {
 

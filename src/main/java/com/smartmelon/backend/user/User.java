@@ -11,10 +11,10 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * An account that can sign in to the operator console.
+ * Akun yang bisa dipakai buat sign in ke operator console.
  *
- * <p>Only the bcrypt hash is stored; the plain password never exists outside the login request and
- * is never logged.
+ * <p>Cuma bcrypt hash yang disimpan; plain password gak pernah ada di luar login request dan
+ * gak bakal pernah di-log.
  */
 @Entity
 @Table(name = "app_user")
