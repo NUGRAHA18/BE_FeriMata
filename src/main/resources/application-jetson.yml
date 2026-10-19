@@ -8,7 +8,7 @@
 
 spring:
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://127.0.0.1:5432/smartmelon}
+    url: ${DATABASE_URL:jdbc:postgresql://127.0.0.1:5432/fertimata}
     hikari:
       maximum-pool-size: ${DATABASE_POOL_SIZE:5}
 
@@ -25,6 +25,13 @@ app:
   telemetry:
     # Masih nyala: metric yang nggak dikenal jadi sensor placeholder (disabled), biar datanya tetap ke-simpan buat ditinjau.
     auto-register-sensors: ${TELEMETRY_AUTO_REGISTER_SENSORS:true}
+    # NVMe Jetson dibagi sama OS, model vision, dan database. 90 hari pembacaan ≈ satu musim tanam;
+    # payload mentah cukup seminggu buat debugging edge agent.
+    retention:
+      readings-max-age: ${TELEMETRY_READINGS_MAX_AGE:90d}
+      raw-messages-max-age: ${TELEMETRY_RAW_MESSAGES_MAX_AGE:7d}
+      # Batch lebih kecil: CPU dibagi dengan inferensi.
+      batch-size: ${TELEMETRY_RETENTION_BATCH_SIZE:2000}
 
   actuator:
     safety:

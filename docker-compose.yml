@@ -11,24 +11,24 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: smartmelon-postgres
+    container_name: fertimata-postgres
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-smartmelon}
-      POSTGRES_USER: ${DATABASE_USERNAME:-smartmelon}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-smartmelon}
+      POSTGRES_DB: ${POSTGRES_DB:-fertimata}
+      POSTGRES_USER: ${DATABASE_USERNAME:-fertimata}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-fertimata}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-smartmelon} -d ${POSTGRES_DB:-smartmelon}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-fertimata} -d ${POSTGRES_DB:-fertimata}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
   mosquitto:
     image: eclipse-mosquitto:2
-    container_name: smartmelon-mosquitto
+    container_name: fertimata-mosquitto
     ports:
       - "${MQTT_PORT:-1883}:1883"
     volumes:
@@ -40,7 +40,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: smartmelon-backend
+    container_name: fertimata-backend
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,13 +51,13 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
 
-      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smartmelon}
-      DATABASE_USERNAME: ${DATABASE_USERNAME:-smartmelon}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-smartmelon}
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-fertimata}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-fertimata}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-fertimata}
 
       # Required. There is no default; set it in .env.
       JWT_SECRET: ${JWT_SECRET}
-      JWT_ISSUER: ${JWT_ISSUER:-smartmelon-backend}
+      JWT_ISSUER: ${JWT_ISSUER:-fertimata-backend}
 
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       WEBSOCKET_ALLOWED_ORIGINS: ${WEBSOCKET_ALLOWED_ORIGINS:-http://localhost:3000}

@@ -29,10 +29,19 @@ app:
     # Keliatan di /api/dev/outbox biar developer edge-agent-nya bisa lihat field yang harus mereka hormati.
       command-ttl: ${ACTUATOR_COMMAND_TTL:60s}
 
+  telemetry:
+    # Data simulasi tidak berharga: buang cepat supaya database dev tidak membengkak.
+    retention:
+      readings-max-age: ${TELEMETRY_READINGS_MAX_AGE:7d}
+      raw-messages-max-age: ${TELEMETRY_RAW_MESSAGES_MAX_AGE:1d}
+      initial-delay: ${TELEMETRY_RETENTION_INITIAL_DELAY:30s}
+
   dev:
     simulator:
       enabled: ${DEV_SIMULATOR_ENABLED:true}
-      interval: ${DEV_SIMULATOR_INTERVAL:10s}
+      # 30 detik sudah cukup bikin dashboard "hidup". 10 detik x 5 device x ~45 metrik = ±390 ribu baris
+      # sensor_reading per hari - itu yang bikin database dev meledak.
+      interval: ${DEV_SIMULATOR_INTERVAL:30s}
       
       # Range PLACEHOLDER cuma buat rendering aja. Kode device sama key metric-nya ngikutin katalog.
       devices:
@@ -81,4 +90,4 @@ app:
 
 logging:
   level:
-    com.smartmelon.backend: DEBUG
+    com.fertimata.backend: DEBUG

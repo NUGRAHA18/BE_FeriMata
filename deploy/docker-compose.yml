@@ -9,19 +9,29 @@
 #
 # Relative paths resolve from this directory: ".." is this backend repository, and the frontend
 # repository is expected next to it (override with FRONTEND_CONTEXT).
+#
+# Container logs go to Docker's json-file driver on the Jetson's NVMe. Without a cap they grow without
+# bound, so every service rotates at 10 MB x 3 files. Application data lives in PostgreSQL, not in logs.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    logging: *default-logging
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-smartmelon}
-      POSTGRES_USER: ${DATABASE_USERNAME:-smartmelon}
+      POSTGRES_DB: ${POSTGRES_DB:-fertimata}
+      POSTGRES_USER: ${DATABASE_USERNAME:-fertimata}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-smartmelon} -d ${POSTGRES_DB:-smartmelon}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-fertimata} -d ${POSTGRES_DB:-fertimata}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,6 +42,7 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2
     restart: unless-stopped
+    logging: *default-logging
     ports:
       # Loopback only, for the edge agent running on the host. Never reachable from the LAN.
       - "127.0.0.1:${MQTT_PORT:-1883}:1883"
@@ -44,6 +55,7 @@ services:
       context: ..
       dockerfile: Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -53,15 +65,21 @@ services:
       # jetson = real hardware. dev = telemetry simulator + /api/dev tools, for work without hardware;
       # never while the edge agent is publishing, or simulated and real data are mixed.
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-jetson}
-      DEV_SIMULATOR_ENABLED: ${DEV_SIMULATOR_ENABLED:-true}
-      DEV_SIMULATOR_INTERVAL: ${DEV_SIMULATOR_INTERVAL:-10s}
+      DEV_SIMULATOR_ENABLED: ${DEV_SIMULATOR_ENABLED:-false}
+      DEV_SIMULATOR_INTERVAL: ${DEV_SIMULATOR_INTERVAL:-30s}
 
-      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-smartmelon}
-      DATABASE_USERNAME: ${DATABASE_USERNAME:-smartmelon}
+      # Telemetry retention: bounds sensor_reading / telemetry_message growth (see .env.example).
+      TELEMETRY_RETENTION_ENABLED: ${TELEMETRY_RETENTION_ENABLED:-true}
+      TELEMETRY_READINGS_MAX_AGE: ${TELEMETRY_READINGS_MAX_AGE:-90d}
+      TELEMETRY_RAW_MESSAGES_MAX_AGE: ${TELEMETRY_RAW_MESSAGES_MAX_AGE:-7d}
+      TELEMETRY_RETENTION_INTERVAL: ${TELEMETRY_RETENTION_INTERVAL:-1h}
+
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-fertimata}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-fertimata}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:?DATABASE_PASSWORD is required}
 
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
-      JWT_ISSUER: ${JWT_ISSUER:-smartmelon-backend}
+      JWT_ISSUER: ${JWT_ISSUER:-fertimata-backend}
 
       # Every origin a browser may open the dashboard from (tunnel hostname and LAN address).
       FRONTEND_URL: ${PUBLIC_ORIGINS:?PUBLIC_ORIGINS is required}
@@ -71,6 +89,13 @@ services:
       MQTT_BROKER_URL: tcp://mosquitto:1883
       MQTT_USERNAME: ${MQTT_USERNAME:-}
       MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      # Topic templates; override in .env if the edge agent still uses another prefix.
+      MQTT_TOPIC_TELEMETRY: ${MQTT_TOPIC_TELEMETRY:-fertimata/{deviceId}/telemetry}
+      MQTT_TOPIC_STATUS: ${MQTT_TOPIC_STATUS:-fertimata/{deviceId}/status}
+      MQTT_TOPIC_COMMAND: ${MQTT_TOPIC_COMMAND:-fertimata/{deviceId}/command}
+      MQTT_TOPIC_COMMAND_ACK: ${MQTT_TOPIC_COMMAND_ACK:-fertimata/{deviceId}/command/ack}
+      MQTT_TOPIC_AI: ${MQTT_TOPIC_AI:-fertimata/{deviceId}/ai}
+      MQTT_TOPIC_ALERT: ${MQTT_TOPIC_ALERT:-fertimata/{deviceId}/alert}
 
       BOOTSTRAP_OPERATOR_USERNAME: ${BOOTSTRAP_OPERATOR_USERNAME:-operator}
       BOOTSTRAP_OPERATOR_PASSWORD: ${BOOTSTRAP_OPERATOR_PASSWORD:?BOOTSTRAP_OPERATOR_PASSWORD is required}
@@ -87,9 +112,10 @@ services:
       args:
         # Empty base URL: the browser calls /api and /ws on whatever host served the page.
         NEXT_PUBLIC_API_BASE_URL: ""
-        NEXT_PUBLIC_SITE_NAME: ${SITE_NAME:-Greenhouse Melon}
+        NEXT_PUBLIC_SITE_NAME: ${SITE_NAME:-FertiMata}
         NEXT_PUBLIC_SITE_LOCATION: ${SITE_LOCATION:-}
     restart: unless-stopped
+    logging: *default-logging
     environment:
       NODE_ENV: production
       PORT: "3000"
@@ -99,6 +125,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       - backend
       - frontend

@@ -1,7 +1,7 @@
 # FertiMata — Backend
 
-Backend for **Smart Melon**, a smart-agriculture / IoT system for monitoring and controlling melon
-cultivation. This repository is the **phase 1 foundation**: a production-quality Spring Boot
+Backend for **FertiMata**, a smart-agriculture / IoT system for monitoring and controlling melon
+cultivation (fertigation, soil and air sensing, camera trolley with AI nutrient-stress detection). This repository is the **phase 1 foundation**: a production-quality Spring Boot
 backend that the hardware, AI and frontend work can all be built on top of.
 
 The hardware configuration is **not final**. That constraint shaped the whole design: sensors,
@@ -136,8 +136,8 @@ and `.env.example` documents every variable.
 | Variable | Default | Notes |
 |---|---|---|
 | `JWT_SECRET` | **none** | Required. 32+ characters. No fallback on purpose. |
-| `DATABASE_URL` | `jdbc:postgresql://localhost:5432/smartmelon` | `SPRING_DATASOURCE_URL` also works |
-| `DATABASE_USERNAME` / `DATABASE_PASSWORD` | `smartmelon` / empty | |
+| `DATABASE_URL` | `jdbc:postgresql://localhost:5432/fertimata` | `SPRING_DATASOURCE_URL` also works |
+| `DATABASE_USERNAME` / `DATABASE_PASSWORD` | `fertimata` / empty | |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS origin; never a wildcard |
 | `SPRING_PROFILES_ACTIVE` | none | `dev` enables mock messaging and the simulator; `jetson` is the FERTIMATA Rev A deployment |
 | `APP_MODE` | `PRODUCTION` | `DEVELOPMENT` also makes the API docs public |
@@ -172,6 +172,25 @@ and `.env.example` documents every variable.
 | `TELEMETRY_MAX_CLOCK_SKEW_SECONDS` | `300` | Guards against an unsynced device clock |
 | `TELEMETRY_MAX_METRICS_PER_MESSAGE` | `64` | |
 
+### Telemetry retention
+
+Every telemetry message is stored twice: the raw payload in `telemetry_message` (jsonb) and one
+`sensor_reading` row per metric. Without a cap that is hundreds of thousands of rows per day, which is
+what a scheduled purge now prevents. Rows are deleted in small batches so the table is never locked
+for long.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `TELEMETRY_RETENTION_ENABLED` | `true` | `false` keeps everything forever |
+| `TELEMETRY_READINGS_MAX_AGE` | `30d` (`7d` under `dev`, `90d` under `jetson`) | Age of `sensor_reading` rows, by `recorded_at` |
+| `TELEMETRY_RAW_MESSAGES_MAX_AGE` | `3d` (`1d` under `dev`, `7d` under `jetson`) | Age of raw `telemetry_message` rows, by `received_at` |
+| `TELEMETRY_RETENTION_INTERVAL` | `1h` | How often the purge runs |
+| `TELEMETRY_RETENTION_BATCH_SIZE` | `5000` (`2000` under `jetson`) | Rows per delete transaction |
+| `TELEMETRY_RETENTION_MAX_BATCHES_PER_RUN` | `40` | Ceiling per run; a large backlog drains over several runs |
+
+Application logs are **not** stored in the database. They go to stdout (Docker's json-file driver,
+capped at 10 MB x 3 per container in `deploy/docker-compose.yml`).
+
 The full list, with comments, is in [`.env.example`](.env.example).
 
 ---
@@ -187,7 +206,7 @@ device              edge devices, liveness
 sensor              measurement channels — a sensor is a ROW, never a table
 actuator            controllable outputs
 telemetry_message   raw inbound payloads (jsonb), including rejected ones
-sensor_reading      one normalised row per metric per message
+sensor_reading      one normalised row per metric per message (message link nulled once the raw payload is purged)
 actuator_command    append-only audit: who, what, when, manual or automatic, did it work
 alert               operational alerts and acknowledgement
 plant               minimal; per-plant tracking is not a settled requirement
@@ -221,12 +240,12 @@ code. Every topic is built from a configurable template; `{deviceId}` is the dev
 
 | Kind | Template | Direction |
 |---|---|---|
-| Telemetry | `smartmelon/{deviceId}/telemetry` | device → backend |
-| Status / heartbeat | `smartmelon/{deviceId}/status` | device → backend |
-| Command | `smartmelon/{deviceId}/command` | backend → device |
-| Command ack | `smartmelon/{deviceId}/command/ack` | device → backend |
-| AI detection | `smartmelon/{deviceId}/ai` | device → backend |
-| Device alert | `smartmelon/{deviceId}/alert` | device → backend |
+| Telemetry | `fertimata/{deviceId}/telemetry` | device → backend |
+| Status / heartbeat | `fertimata/{deviceId}/status` | device → backend |
+| Command | `fertimata/{deviceId}/command` | backend → device |
+| Command ack | `fertimata/{deviceId}/command/ack` | device → backend |
+| AI detection | `fertimata/{deviceId}/ai` | device → backend |
+| Device alert | `fertimata/{deviceId}/alert` | device → backend |
 
 Change them in `app.mqtt.topics` (or the `MQTT_TOPIC_*` variables) and the whole system follows.
 
@@ -301,7 +320,7 @@ Full documentation: **<http://localhost:8080/swagger-ui.html>**
 | `PATCH` | `/api/actuators/{id}` | Rename, enable/disable, change `maxRunSeconds` (0 removes it) |
 | `POST` | `/api/actuators/{id}/commands` | **Command an actuator** → `202` |
 | `GET` | `/api/actuators/{id}/commands` | Command history |
-| `GET` | `/api/alerts` | List alerts (`?acknowledged=&severity=`) |
+| `GET` | `/api/alerts` | List alerts (`?acknowledged=&severity=&deviceId=&sensorId=&actuatorId=`, filters combine) |
 | `GET` | `/api/alerts/{id}` | One alert |
 | `PATCH` | `/api/alerts/{id}/acknowledge` | Acknowledge |
 | `GET` | `/api/ai/detections` | List detections (`?stationCode=&deviceId=&detectionType=`) |
@@ -373,7 +392,7 @@ client.activate();
 | `/topic/devices` | `DEVICE_STATUS_CHANGED` |
 | `/topic/actuators` | `ACTUATOR_STATUS_CHANGED` |
 | `/topic/actuators/commands` | `ACTUATOR_COMMAND_UPDATED` |
-| `/topic/alerts` | `ALERT_CREATED` |
+| `/topic/alerts` | `ALERT_CREATED`, `ALERT_UPDATED` (acknowledged) |
 | `/topic/ai` | `AI_DETECTION_CREATED` |
 | `/topic/events` | all of the above |
 
@@ -480,7 +499,7 @@ anywhere else**: a real broker needs credentials and TLS, which the backend read
 ## Project structure
 
 ```
-src/main/java/com/smartmelon/backend/
+src/main/java/com/fertimata/backend/
 ├── config/         application properties, OpenAPI, JPA auditing, first-operator bootstrap
 ├── common/         exception hierarchy + global handler, API error and page shapes, JSON helper
 ├── security/       Spring Security config, JWT issuing and role mapping, login endpoint
@@ -514,8 +533,8 @@ Honest list of what this phase does **not** do:
 2. **No agronomic alerts.** Only infrastructure alerts (device offline, command failed) exist.
 3. **WebSocket does not scale past one instance.** The in-memory STOMP broker only reaches clients
    on the same instance; multiple instances need a broker relay.
-4. **No telemetry retention policy.** `sensor_reading` grows without bound. Partitioning or
-   downsampling should be decided before a long deployment.
+4. **No downsampling.** Telemetry older than the retention window is deleted, not aggregated. A
+   long-term history (seasons, not weeks) needs a downsampled table.
 5. **No refresh token.** A 60-minute access token, then sign in again.
 6. **One role.** `OPERATOR` only, by design.
 7. **No image storage.** `ai_detection.image_url` is a reference; how images are transported is
@@ -541,7 +560,7 @@ still needed, and what is in place meanwhile:
 | 7 | AI | Output contract: labels, boxes, image transport | Label is free text; extra fields kept in metadata |
 | 8 | Agronomy + AI | Whether cultivation is tracked per plant | `plant` minimal, `ai_detection.plant_id` nullable |
 | 9 | Agronomy | Thresholds and automation rules | Nothing evaluated; engine is a no-op |
-| 10 | Operations | Telemetry retention and downsampling | None; table grows unbounded |
+| 10 | Operations | Downsampling for long-term history | Time-based retention purge; no aggregation |
 
 When one of these is answered, the change should be configuration or a small migration — not a
 rewrite. That was the goal of this phase.

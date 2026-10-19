@@ -11,11 +11,11 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.smartmelon</groupId>
-    <artifactId>smartmelon-backend</artifactId>
+    <groupId>com.fertimata</groupId>
+    <artifactId>fertimata-backend</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>Smart Melon Backend</name>
-    <description>Backend foundation for the Smart Melon smart-agriculture / IoT platform</description>
+    <name>FertiMata Backend</name>
+    <description>Backend foundation for the FertiMata smart-agriculture / IoT platform</description>
 
     <properties>
         <java.version>17</java.version>
@@ -70,7 +70,7 @@
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
 
-        <!-- MQTT (abstracted behind com.smartmelon.backend.mqtt.MqttPublisher) -->
+        <!-- MQTT (abstracted behind com.fertimata.backend.mqtt.MqttPublisher) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-integration</artifactId>
@@ -145,6 +145,14 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <!-- `mvnw spring-boot:run` is only ever used on a developer machine, so it runs the dev
+                         profile (simulator, loopback MQTT, /api/dev). SPRING_PROFILES_ACTIVE in .env does NOT
+                         activate a profile: Spring only maps that variable name from the OS environment, not
+                         from an imported properties file. The packaged jar / Docker image is unaffected and
+                         keeps taking the profile from the real environment. -->
+                    <profiles>
+                        <profile>dev</profile>
+                    </profiles>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>

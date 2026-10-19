@@ -1,7 +1,7 @@
 # Default configuration
 spring:
   application:
-    name: smartmelon-backend
+    name: fertimata-backend
 
   # Katalog hardware ini ngejelasin device, sensor, sama actuator-nya
   # Arahkan HARDWARE_CATALOG_LOCATION (ini environment variable, bukan entry di .env)
@@ -12,8 +12,8 @@ spring:
       - "optional:${HARDWARE_CATALOG_LOCATION:classpath:hardware/fertimata-rev-a.yml}"
 
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/smartmelon}
-    username: ${DATABASE_USERNAME:smartmelon}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fertimata}
+    username: ${DATABASE_USERNAME:fertimata}
     password: ${DATABASE_PASSWORD:}
     hikari:
       maximum-pool-size: ${DATABASE_POOL_SIZE:10}
@@ -94,12 +94,24 @@ app:
     auto-register-sensors: ${TELEMETRY_AUTO_REGISTER_SENSORS:true}
     max-clock-skew: ${TELEMETRY_MAX_CLOCK_SKEW_SECONDS:300}s
     max-metrics-per-message: ${TELEMETRY_MAX_METRICS_PER_MESSAGE:64}
+    # Retensi. Tanpa ini sensor_reading + telemetry_message tumbuh tanpa batas (ratusan ribu baris/hari
+    # pada interval 10 detik). Payload mentah cuma buat debugging kontrak, jadi umurnya pendek; pembacaan
+    # ternormalisasi dipakai grafik riwayat, jadi disimpan lebih lama. Dihapus per batch kecil agar
+    # tidak mengunci tabel.
+    retention:
+      enabled: ${TELEMETRY_RETENTION_ENABLED:true}
+      readings-max-age: ${TELEMETRY_READINGS_MAX_AGE:30d}
+      raw-messages-max-age: ${TELEMETRY_RAW_MESSAGES_MAX_AGE:3d}
+      batch-size: ${TELEMETRY_RETENTION_BATCH_SIZE:5000}
+      max-batches-per-run: ${TELEMETRY_RETENTION_MAX_BATCHES_PER_RUN:40}
+      interval: ${TELEMETRY_RETENTION_INTERVAL:1h}
+      initial-delay: ${TELEMETRY_RETENTION_INITIAL_DELAY:2m}
 
   security:
     jwt:
       # Sengaja nggak dikasih default: secret buat signing yang udah ikut di-ship sama aja artinya nggak ada authentication.
       secret: ${JWT_SECRET}
-      issuer: ${JWT_ISSUER:smartmelon-backend}
+      issuer: ${JWT_ISSUER:fertimata-backend}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL_MINUTES:60}m
     cors:
       allowed-origins: ${FRONTEND_URL:http://localhost:3000}
@@ -116,7 +128,7 @@ app:
   mqtt:
     enabled: ${MQTT_ENABLED:true}
     broker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
-    client-id: ${MQTT_CLIENT_ID:smartmelon-backend}
+    client-id: ${MQTT_CLIENT_ID:fertimata-backend}
     username: ${MQTT_USERNAME:}
     password: ${MQTT_PASSWORD:}
     qos: ${MQTT_QOS:1}
@@ -129,15 +141,15 @@ app:
     # dibangun dari template-template ini, jadi ubah di sini aja bakal ngubah semuanya.
     # {deviceId} bakalan diganti sama kode device-nya.
     topics:
-      telemetry: ${MQTT_TOPIC_TELEMETRY:smartmelon/{deviceId}/telemetry}
-      status: ${MQTT_TOPIC_STATUS:smartmelon/{deviceId}/status}
-      command: ${MQTT_TOPIC_COMMAND:smartmelon/{deviceId}/command}
-      command-ack: ${MQTT_TOPIC_COMMAND_ACK:smartmelon/{deviceId}/command/ack}
-      ai: ${MQTT_TOPIC_AI:smartmelon/{deviceId}/ai}
-      alert: ${MQTT_TOPIC_ALERT:smartmelon/{deviceId}/alert}
+      telemetry: ${MQTT_TOPIC_TELEMETRY:fertimata/{deviceId}/telemetry}
+      status: ${MQTT_TOPIC_STATUS:fertimata/{deviceId}/status}
+      command: ${MQTT_TOPIC_COMMAND:fertimata/{deviceId}/command}
+      command-ack: ${MQTT_TOPIC_COMMAND_ACK:fertimata/{deviceId}/command/ack}
+      ai: ${MQTT_TOPIC_AI:fertimata/{deviceId}/ai}
+      alert: ${MQTT_TOPIC_ALERT:fertimata/{deviceId}/alert}
 
 logging:
   level:
     root: INFO
-    com.smartmelon.backend: ${LOG_LEVEL_APP:INFO}
+    com.fertimata.backend: ${LOG_LEVEL_APP:INFO}
     org.springframework.integration.mqtt: ${LOG_LEVEL_MQTT:INFO}

@@ -11,7 +11,7 @@ app:
   security:
     jwt:
       secret: integration-test-secret-key-at-least-32-characters
-      issuer: smartmelon-test
+      issuer: fertimata-test
       access-token-ttl: 10m
     cors:
       allowed-origins: http://localhost:3000
@@ -31,17 +31,26 @@ app:
     auto-register-sensors: true
     max-clock-skew: 300s
     max-metrics-per-message: 64
+    retention:
+      # Off: a purge running mid-test would make row counts non-deterministic.
+      enabled: false
+      readings-max-age: 30d
+      raw-messages-max-age: 3d
+      batch-size: 1000
+      max-batches-per-run: 10
+      interval: 1h
+      initial-delay: 1h
 
   mqtt:
     # The loopback transport, so the tests need no broker.
     enabled: false
     topics:
-      telemetry: smartmelon/{deviceId}/telemetry
-      status: smartmelon/{deviceId}/status
-      command: smartmelon/{deviceId}/command
-      command-ack: smartmelon/{deviceId}/command/ack
-      ai: smartmelon/{deviceId}/ai
-      alert: smartmelon/{deviceId}/alert
+      telemetry: fertimata/{deviceId}/telemetry
+      status: fertimata/{deviceId}/status
+      command: fertimata/{deviceId}/command
+      command-ack: fertimata/{deviceId}/command/ack
+      ai: fertimata/{deviceId}/ai
+      alert: fertimata/{deviceId}/alert
 
   catalog:
     # The tests create their own fixtures; the hardware catalog would make counts depend on it.
@@ -57,5 +66,5 @@ spring:
 
 logging:
   level:
-    com.smartmelon.backend: INFO
+    com.fertimata.backend: INFO
     org.hibernate.SQL: WARN

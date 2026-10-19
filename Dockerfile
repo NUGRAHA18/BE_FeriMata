@@ -14,11 +14,11 @@ FROM eclipse-temurin:17-jre AS runtime
 WORKDIR /app
 
 # Never run the application as root.
-RUN groupadd --system smartmelon && useradd --system --gid smartmelon --home /app smartmelon
+RUN groupadd --system fertimata && useradd --system --gid fertimata --home /app fertimata
 
 COPY --from=build /workspace/target/*.jar /app/application.jar
-RUN chown -R smartmelon:smartmelon /app
-USER smartmelon
+RUN chown -R fertimata:fertimata /app
+USER fertimata
 
 EXPOSE 8080
 
