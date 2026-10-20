@@ -80,6 +80,7 @@ services:
 
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_ISSUER: ${JWT_ISSUER:-fertimata-backend}
+      JWT_REFRESH_TOKEN_TTL_DAYS: ${JWT_REFRESH_TOKEN_TTL_DAYS:-7}
 
       # Every origin a browser may open the dashboard from (tunnel hostname and LAN address).
       FRONTEND_URL: ${PUBLIC_ORIGINS:?PUBLIC_ORIGINS is required}

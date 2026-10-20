@@ -13,6 +13,7 @@ app:
       secret: integration-test-secret-key-at-least-32-characters
       issuer: fertimata-test
       access-token-ttl: 10m
+      refresh-token-ttl: 7d
     cors:
       allowed-origins: http://localhost:3000
 
@@ -55,6 +56,13 @@ app:
   catalog:
     # The tests create their own fixtures; the hardware catalog would make counts depend on it.
     enabled: false
+
+  cultivation:
+    zone: Asia/Jakarta
+    default-phases:
+      - { code: VEGETATIVE, name: Vegetatif, start-hst: 0, end-hst: 24, ec-target-min: 1.5, ec-target-max: 1.8, ratio-n: 5.4, ratio-p: 1, ratio-k: 6.3 }
+      - { code: YOUNG_FRUIT, name: Buah muda, start-hst: 25, end-hst: 44, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 4.1, ratio-p: 1, ratio-k: 7.9 }
+      - { code: FRUIT_ENLARGEMENT, name: Pembesaran buah, start-hst: 45, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 5.4, ratio-p: 1, ratio-k: 4.7 }
 
 spring:
   jpa:

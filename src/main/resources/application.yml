@@ -107,12 +107,26 @@ app:
       interval: ${TELEMETRY_RETENTION_INTERVAL:1h}
       initial-delay: ${TELEMETRY_RETENTION_INITIAL_DELAY:2m}
 
+  cultivation:
+    # "Hari ini" untuk hitung HST (hari setelah transplant).
+    zone: ${CULTIVATION_ZONE:Asia/Jakarta}
+    # Template fase untuk siklus baru. Rasio N:P:K dan EC target dari Arsitektur-Sistem.md s12.
+    # BATAS HST (start/end) MASIH PLACEHOLDER: tim agronomi belum menetapkannya. Operator bisa
+    # mengubah semua angka ini per siklus lewat PUT /api/cultivation/cycles/{id}/phases.
+    default-phases:
+      - { code: VEGETATIVE, name: Vegetatif, start-hst: 0, end-hst: 24, ec-target-min: 1.5, ec-target-max: 1.8, ratio-n: 5.4, ratio-p: 1, ratio-k: 6.3 }
+      - { code: YOUNG_FRUIT, name: Buah muda, start-hst: 25, end-hst: 44, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 4.1, ratio-p: 1, ratio-k: 7.9, notes: "N turun, K naik - fase penentu Brix" }
+      - { code: FRUIT_ENLARGEMENT, name: Pembesaran buah, start-hst: 45, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 5.4, ratio-p: 1, ratio-k: 4.7 }
+
   security:
     jwt:
       # Sengaja nggak dikasih default: secret buat signing yang udah ikut di-ship sama aja artinya nggak ada authentication.
       secret: ${JWT_SECRET}
       issuer: ${JWT_ISSUER:fertimata-backend}
       access-token-ttl: ${JWT_ACCESS_TOKEN_TTL_MINUTES:60}m
+      # Lama sesi tanpa login ulang. Token akses tetap pendek; klien memperpanjangnya diam-diam
+      # lewat POST /api/auth/refresh selama refresh token masih hidup.
+      refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL_DAYS:7}d
     cors:
       allowed-origins: ${FRONTEND_URL:http://localhost:3000}
       allowed-methods: GET,POST,PUT,PATCH,DELETE,OPTIONS

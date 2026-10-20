@@ -10,12 +10,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Akun yang bisa dipakai buat sign in ke operator console.
- *
- * <p>Cuma bcrypt hash yang disimpan; plain password gak pernah ada di luar login request dan
- * gak bakal pernah di-log.
- */
 @Entity
 @Table(name = "app_user")
 @Getter
@@ -38,6 +32,10 @@ public class User extends AuditedEntity {
 
     @Column(nullable = false)
     private boolean enabled = true;
+
+    /** True setelah reset oleh admin atau pada akun baru: klien meminta sandi baru saat masuk. */
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword = false;
 
     public User(String username, String passwordHash, String fullName, Role role) {
         this.username = username;

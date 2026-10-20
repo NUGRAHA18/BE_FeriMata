@@ -14,6 +14,7 @@ import com.fertimata.backend.alert.AlertSource;
 import com.fertimata.backend.alert.AlertType;
 import com.fertimata.backend.common.response.PageResponse;
 import com.fertimata.backend.config.AppProperties;
+import com.fertimata.backend.cultivation.CultivationService;
 import com.fertimata.backend.device.Device;
 import com.fertimata.backend.device.DeviceRepository;
 import com.fertimata.backend.device.DeviceService;
@@ -58,6 +59,9 @@ class DashboardServiceTest {
     @Mock
     private AiDetectionService aiDetectionService;
 
+    @Mock
+    private CultivationService cultivationService;
+
     private DashboardService dashboardService;
 
     @BeforeEach
@@ -70,6 +74,7 @@ class DashboardServiceTest {
                 commandService,
                 alertService,
                 aiDetectionService,
+                cultivationService,
                 new AppProperties(AppProperties.Mode.DEVELOPMENT));
     }
 
@@ -101,6 +106,7 @@ class DashboardServiceTest {
         when(alertService.unacknowledgedCount(AlertSeverity.CRITICAL)).thenReturn(1L);
         when(alertService.unacknowledgedCount(AlertSeverity.WARNING)).thenReturn(0L);
         when(aiDetectionService.latest()).thenReturn(Optional.empty());
+        when(cultivationService.activeStatus()).thenReturn(Optional.empty());
 
         DashboardOverviewResponse overview = dashboardService.overview();
 
@@ -121,6 +127,7 @@ class DashboardServiceTest {
         assertThat(overview.system().messagingConnected()).isTrue();
 
         assertThat(overview.latestAiDetection()).isNull();
+        assertThat(overview.cultivation()).isNull();
         assertThat(overview.recentActivity()).hasSize(1);
         assertThat(overview.recentActivity().get(0).kind()).isEqualTo("ALERT");
     }

@@ -320,6 +320,19 @@ Full documentation: **<http://localhost:8080/swagger-ui.html>**
 | `PATCH` | `/api/actuators/{id}` | Rename, enable/disable, change `maxRunSeconds` (0 removes it) |
 | `POST` | `/api/actuators/{id}/commands` | **Command an actuator** → `202` |
 | `GET` | `/api/actuators/{id}/commands` | Command history |
+| `POST` | `/api/auth/refresh` | Exchange a refresh token for a new pair (single-use, rotated) |
+| `POST` | `/api/auth/logout` | Revoke this device's refresh token |
+| `POST` | `/api/auth/change-password` | Change own password; other sessions are revoked |
+| `GET` `POST` | `/api/users` | Accounts (ADMIN): list, create |
+| `PATCH` | `/api/users/{id}` | Name, role, enabled (ADMIN; self and last admin protected) |
+| `POST` | `/api/users/{id}/reset-password` | Temporary password, must be changed at next sign-in (ADMIN) |
+| `GET` | `/api/cultivation/active` | Today's HST, phase in effect (EC target, N:P:K), next phase |
+| `GET` `POST` | `/api/cultivation/cycles` | Planting cycles with growth phases |
+| `PATCH` | `/api/cultivation/cycles/{id}` | Rename, dates, status (ACTIVE / ENDED) |
+| `PUT` | `/api/cultivation/cycles/{id}/phases` | Replace the growth phases |
+| `GET` `POST` | `/api/plants` | Treatment plants (`?cycleId=&treatmentCode=&blockCode=&stationCode=`); `/batch` for many |
+| `PATCH` | `/api/plants/{id}` | Update a plant |
+| `GET` `POST` | `/api/plants/{id}/observations` | Manual observation log (height, leaves, leaf-3 size, notes + soil snapshot) |
 | `GET` | `/api/alerts` | List alerts (`?acknowledged=&severity=&deviceId=&sensorId=&actuatorId=`, filters combine) |
 | `GET` | `/api/alerts/{id}` | One alert |
 | `PATCH` | `/api/alerts/{id}/acknowledge` | Acknowledge |
@@ -535,8 +548,8 @@ Honest list of what this phase does **not** do:
    on the same instance; multiple instances need a broker relay.
 4. **No downsampling.** Telemetry older than the retention window is deleted, not aggregated. A
    long-term history (seasons, not weeks) needs a downsampled table.
-5. **No refresh token.** A 60-minute access token, then sign in again.
-6. **One role.** `OPERATOR` only, by design.
+5. **Roles are coarse.** `ADMIN` / `OPERATOR` / `VIEWER` with a fixed hierarchy; no per-feature
+   permissions.
 7. **No image storage.** `ai_detection.image_url` is a reference; how images are transported is
    undecided.
 8. **Commands are accepted for offline devices.** They are recorded and published and the broker

@@ -11,6 +11,7 @@ import com.fertimata.backend.security.auth.AppUserDetails;
 import com.fertimata.backend.security.auth.AuthService;
 import com.fertimata.backend.security.auth.LoginRequest;
 import com.fertimata.backend.security.auth.LoginResponse;
+import com.fertimata.backend.security.auth.RefreshTokenService;
 import com.fertimata.backend.security.jwt.JwtTokenService;
 import com.fertimata.backend.support.TestFixtures;
 import com.fertimata.backend.user.Role;
@@ -28,6 +29,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -40,6 +42,12 @@ class AuthServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
+    @Mock
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private AuthService authService;
@@ -54,12 +62,16 @@ class AuthServiceTest {
 
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
         Instant expiry = Instant.now().plusSeconds(3600);
-        when(jwtTokenService.issue(principal)).thenReturn(new JwtTokenService.IssuedToken("token-value", expiry, 3600));
+        when(jwtTokenService.issue(any())).thenReturn(new JwtTokenService.IssuedToken("token-value", expiry, 3600));
         when(userRepository.findById(7L)).thenReturn(Optional.of(user));
+        Instant refreshExpiry = expiry.plusSeconds(7 * 86400);
+        when(refreshTokenService.issue(any(), any())).thenReturn(new RefreshTokenService.Issued("refresh-value", refreshExpiry));
 
-        LoginResponse response = authService.login(new LoginRequest("operator", "correct-password"));
+        LoginResponse response = authService.login(new LoginRequest("operator", "correct-password"), "test-agent");
 
         assertThat(response.accessToken()).isEqualTo("token-value");
+        assertThat(response.refreshToken()).isEqualTo("refresh-value");
+        assertThat(response.refreshExpiresAt()).isEqualTo(refreshExpiry);
         assertThat(response.tokenType()).isEqualTo("Bearer");
         assertThat(response.expiresIn()).isEqualTo(3600);
         assertThat(response.expiresAt()).isEqualTo(expiry);
@@ -74,7 +86,7 @@ class AuthServiceTest {
     void invalidCredentials() {
         when(authenticationManager.authenticate(any())).thenThrow(new BadCredentialsException("Bad credentials"));
 
-        assertThatThrownBy(() -> authService.login(new LoginRequest("operator", "wrong-password")))
+        assertThatThrownBy(() -> authService.login(new LoginRequest("operator", "wrong-password"), null))
                 .isInstanceOf(BadCredentialsException.class);
 
         verify(jwtTokenService, never()).issue(any());

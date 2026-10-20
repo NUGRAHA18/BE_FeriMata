@@ -8,6 +8,7 @@ import com.fertimata.backend.alert.AlertResponse;
 import com.fertimata.backend.alert.AlertService;
 import com.fertimata.backend.alert.AlertSeverity;
 import com.fertimata.backend.config.AppProperties;
+import com.fertimata.backend.cultivation.CultivationService;
 import com.fertimata.backend.device.DeviceRepository;
 import com.fertimata.backend.device.DeviceService;
 import com.fertimata.backend.device.DeviceStatus;
@@ -41,6 +42,7 @@ public class DashboardService {
     private final ActuatorCommandService commandService;
     private final AlertService alertService;
     private final AiDetectionService aiDetectionService;
+    private final CultivationService cultivationService;
     private final AppProperties appProperties;
 
     public DashboardService(
@@ -51,6 +53,7 @@ public class DashboardService {
             ActuatorCommandService commandService,
             AlertService alertService,
             AiDetectionService aiDetectionService,
+            CultivationService cultivationService,
             AppProperties appProperties) {
         this.deviceService = deviceService;
         this.deviceRepository = deviceRepository;
@@ -59,6 +62,7 @@ public class DashboardService {
         this.commandService = commandService;
         this.alertService = alertService;
         this.aiDetectionService = aiDetectionService;
+        this.cultivationService = cultivationService;
         this.appProperties = appProperties;
     }
 
@@ -98,7 +102,25 @@ public class DashboardService {
                 actuatorService.allStatuses(),
                 alerts,
                 aiDetectionService.latest().orElse(null),
-                recentActivity(activeAlerts));
+                recentActivity(activeAlerts),
+                cultivation());
+    }
+
+    private DashboardOverviewResponse.CultivationSection cultivation() {
+        return cultivationService
+                .activeStatus()
+                .map(s -> new DashboardOverviewResponse.CultivationSection(
+                        s.cycle().id(),
+                        s.cycle().code(),
+                        s.cycle().name(),
+                        s.cycle().transplantDate(),
+                        s.hst(),
+                        s.currentPhase(),
+                        s.nextPhase(),
+                        s.daysUntilNextPhase(),
+                        s.plantCount(),
+                        s.treatmentPlantCount()))
+                .orElse(null);
     }
 
     /**

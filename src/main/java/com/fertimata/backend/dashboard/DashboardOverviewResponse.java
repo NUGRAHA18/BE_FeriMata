@@ -3,10 +3,12 @@ package com.fertimata.backend.dashboard;
 import com.fertimata.backend.actuator.dto.ActuatorStatusResponse;
 import com.fertimata.backend.ai.AiDetectionResponse;
 import com.fertimata.backend.alert.AlertResponse;
+import com.fertimata.backend.cultivation.dto.GrowthPhaseResponse;
 import com.fertimata.backend.device.DeviceStatusResponse;
 import com.fertimata.backend.telemetry.dto.SensorReadingResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -23,7 +25,27 @@ public record DashboardOverviewResponse(
         List<ActuatorStatusResponse> actuators,
         AlertSection alerts,
         @Schema(description = "Null until the vision model reports something") AiDetectionResponse latestAiDetection,
-        List<ActivityEntry> recentActivity) {
+        List<ActivityEntry> recentActivity,
+        @Schema(description = "Null when no planting cycle is active") CultivationSection cultivation) {
+
+    /**
+     * Siklus tanam aktif hari ini: umur tanaman dan target fase, untuk kartu Beranda dan fuzzy dosing.
+     *
+     * @param hst hari setelah transplant
+     * @param currentPhase null bila HST di luar fase yang didefinisikan
+     */
+    @Schema(name = "DashboardCultivationSection")
+    public record CultivationSection(
+            Long cycleId,
+            String cycleCode,
+            String cycleName,
+            LocalDate transplantDate,
+            long hst,
+            GrowthPhaseResponse currentPhase,
+            GrowthPhaseResponse nextPhase,
+            Long daysUntilNextPhase,
+            long plantCount,
+            long treatmentPlantCount) {}
 
     /**
      * How the backend itself is running.

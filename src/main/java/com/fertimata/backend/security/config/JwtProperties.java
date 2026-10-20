@@ -21,4 +21,5 @@ import org.springframework.validation.annotation.Validated;
 public record JwtProperties(
         @NotBlank @Size(min = 32, message = "JWT secret must be at least 32 characters") String secret,
         @NotBlank String issuer,
-        @NotNull Duration accessTokenTtl) {}
+        @NotNull Duration accessTokenTtl,
+        @NotNull Duration refreshTokenTtl) {}

@@ -3,6 +3,7 @@ package com.fertimata.backend.security.config;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import com.fertimata.backend.config.AppProperties;
 import com.fertimata.backend.security.jwt.JwtRoleConverter;
+import com.fertimata.backend.user.Role;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.crypto.SecretKey;
@@ -12,6 +13,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -67,15 +70,28 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> {
-                    requests.requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll();
+                    // Refresh/logout membawa refresh token sebagai kredensialnya sendiri.
+                    requests.requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/refresh", "/api/auth/logout")
+                            .permitAll();
                     requests.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info")
                             .permitAll();
-                 // Handshake STOMP bersifat publik; frame CONNECT itu sendiri diotentikasi oleh
-                 // WebSocketAuthenticationInterceptor, yang dapat membaca token dari frame tersebut.
+                    // Handshake STOMP bersifat publik; frame CONNECT itu sendiri diotentikasi oleh
+                    // WebSocketAuthenticationInterceptor, yang dapat membaca token dari frame tersebut.
                     requests.requestMatchers("/ws", "/ws/**").permitAll();
                     if (appProperties.isDevelopment()) {
                         requests.requestMatchers(DOCS_PATHS).permitAll();
                     }
+                    // Siapa pun yang masuk boleh mengganti sandinya sendiri.
+                    requests.requestMatchers(HttpMethod.POST, "/api/auth/change-password").authenticated();
+                    // Kelola akun hanya ADMIN.
+                    requests.requestMatchers("/api/users/**").hasRole(Role.Names.ADMIN);
+                    // VIEWER hanya membaca: setiap permintaan yang mengubah data butuh OPERATOR (ADMIN
+                    // mewarisinya lewat RoleHierarchy). Satu aturan di sini lebih aman daripada
+                    // mengandalkan anotasi di tiap controller.
+                    requests.requestMatchers(HttpMethod.POST, "/api/**").hasRole(Role.Names.OPERATOR);
+                    requests.requestMatchers(HttpMethod.PUT, "/api/**").hasRole(Role.Names.OPERATOR);
+                    requests.requestMatchers(HttpMethod.PATCH, "/api/**").hasRole(Role.Names.OPERATOR);
+                    requests.requestMatchers(HttpMethod.DELETE, "/api/**").hasRole(Role.Names.OPERATOR);
                     requests.anyRequest().authenticated();
                 })
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)
@@ -93,6 +109,21 @@ public class SecurityConfig {
      * <i>delegating encoder</i> karena tidak ada format kata sandi terwariskan (<i>legacy</i>) yang perlu 
      * dimigrasi, serta penggunaan format tunggal menjaga konsistensi nilai <i>hash</i> yang tersimpan.
      */
+    /**
+     * ADMIN > OPERATOR > VIEWER. Dipakai otomatis oleh aturan URL di atas dan oleh
+     * {@code @PreAuthorize("hasRole(...)")}, sehingga aturan yang menyebut OPERATOR ikut berlaku
+     * untuk ADMIN tanpa menulis dua nama di setiap tempat.
+     */
+    @Bean
+    public RoleHierarchy roleHierarchy() {
+        return RoleHierarchyImpl.withDefaultRolePrefix()
+                .role(Role.Names.ADMIN)
+                .implies(Role.Names.OPERATOR)
+                .role(Role.Names.OPERATOR)
+                .implies(Role.Names.VIEWER)
+                .build();
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

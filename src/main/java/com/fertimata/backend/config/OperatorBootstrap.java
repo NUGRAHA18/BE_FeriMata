@@ -54,8 +54,9 @@ public class OperatorBootstrap implements ApplicationRunner {
         }
 
         User user = new User(
-                username, passwordEncoder.encode(password), properties.operatorFullName(), Role.OPERATOR);
+                username, passwordEncoder.encode(password), properties.operatorFullName(), Role.ADMIN);
+        user.setMustChangePassword(true);
         userRepository.save(user);
-        log.warn("Created the initial OPERATOR account '{}'. Change its password after the first sign-in.", username);
+        log.warn("Created the initial ADMIN account '{}'. It must change its password at the first sign-in.", username);
     }
 }
