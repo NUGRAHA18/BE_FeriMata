@@ -129,17 +129,20 @@ class PlantServiceTest {
     }
 
     @Test
-    @DisplayName("a plant without a plot gets no soil snapshot and no HST without a cycle")
+    @DisplayName("a plant without a plot uses the single Rev A soil sensor, and gets no HST without a cycle")
     void observationWithoutPlotOrCycle() {
         Plant plant = new Plant("X", "X");
         TestFixtures.setId(plant, 10L);
         when(plantRepository.findById(10L)).thenReturn(Optional.of(plant));
+        Device device = TestFixtures.device(1L, "GREENHOUSE-01");
+        Sensor soilA = TestFixtures.sensor(1L, device, "SOIL-A-PH", "soil_a.ph", "pH");
+        when(sensorReadingRepository.findLatestPerSensor()).thenReturn(List.of(reading(soilA, "6.4")));
 
         PlantObservationResponse response = service.addObservation(
                 10L, new PlantObservationRequest(null, null, 5, null, null, null, null), null);
 
         assertThat(response.hst()).isNull();
-        assertThat(response.soilSnapshot()).isEmpty();
+        assertThat(response.soilSnapshot()).containsOnlyKeys("soil_a.ph");
         assertThat(response.observedBy()).isNull();
     }
 

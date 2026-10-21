@@ -14,7 +14,8 @@ import java.util.Map;
  *
  * <p>FERTIMATA Rev A sends a multi-label result: {@code scores} holds one value per label (N, P and K
  * stress), {@code label} may then be omitted, {@code stationCode} names the trolley stop and
- * {@code captureId} ties together the results cropped from one frame.
+ * {@code captureId} ties together the results cropped from one frame. {@code panDirection} says
+ * whether the camera faced east or west (TIMUR / BARAT), since every station is shot both ways.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record AiDetectionPayload(
@@ -27,5 +28,6 @@ public record AiDetectionPayload(
         String plantCode,
         Map<String, BigDecimal> scores,
         String stationCode,
+        String panDirection,
         String captureId,
         Map<String, Object> metadata) {}

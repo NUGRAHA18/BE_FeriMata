@@ -37,12 +37,17 @@ public class CommandSafetyPolicy {
                     properties.activeStates());
         }
         log.info(
-                "Command safety: {} guard(s), activating={}, timedTypes={}, blockedOnBackupPower={}, exclusive={}",
+                "Command safety: {} guard(s), activating={}, timedTypes={}, blockedOnBackupPower={}, exclusive={}, "
+                        + "blockedWhileActive={}, signals={}",
                 this.guards.size(),
                 properties.activatingCommands(),
                 properties.timedTypes(),
                 properties.blockedOnBackupPowerTypes(),
-                properties.exclusiveTypeGroups());
+                properties.exclusiveTypeGroups(),
+                properties.blockedWhileActive(),
+                properties.signalInterlocks().stream()
+                        .map(signal -> signal.name() + "=" + signal.device() + "/" + signal.metricKey())
+                        .toList());
     }
 
     /** Throws when any guard refuses; applies to operator, automation and system commands alike. */

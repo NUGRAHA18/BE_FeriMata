@@ -16,7 +16,7 @@ public record PlantRequest(
         @Size(max = 16) @Schema(example = "N-", description = "K0, N-, P-, K-; null for an ordinary production plant") String treatmentCode,
         @Size(max = 16) @Schema(example = "B1") String blockCode,
         @Size(max = 16) @Schema(example = "R1") String rowCode,
-        @Size(max = 8) @Schema(example = "A", description = "Soil sensor that represents this plant: A or B") String plotCode,
+        @Size(max = 8) @Schema(example = "A", description = "Soil sensor that represents this plant; Rev A has only A, which is also the default when empty") String plotCode,
         @Size(max = 32) @Schema(example = "ST-03") String stationCode,
         @Min(0) Integer positionInRow,
         @Size(max = 16) @Schema(example = "FERTIMATA", description = "FERTIMATA, SIMONKORI or NONE") String comparisonGroup,

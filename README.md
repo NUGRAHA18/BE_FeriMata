@@ -566,7 +566,7 @@ still needed, and what is in place meanwhile:
 |---|---|---|---|
 | 1 | Hardware | Final sensor set, units, sampling rate | Rev A catalog in `hardware/fertimata-rev-a.yml`; units still to verify on arrival |
 | 2 | Hardware | Final actuator set and command names | Rev A catalog; `commandType` free text, `ON` configured as the activating command |
-| 3 | Hardware + agronomy | Command parameter rules (e.g. maximum run time) | Configurable interlocks + per-actuator `maxRunSeconds`; pump limits await calibration |
+| 3 | Hardware + agronomy | Command parameter rules (e.g. maximum run time) | Configurable interlocks (incl. float LOW and pan-while-moving) + per-actuator `maxRunSeconds`; limits are the provisional §5.4 values until calibration |
 | 4 | Hardware | MQTT topic convention | Configurable templates; no topic string in code |
 | 5 | Firmware | Heartbeat interval → the offline timeout | Configurable, provisional default 120 s |
 | 6 | Hardware | Telemetry payload shape | Raw payload retained; metric keys resolved at runtime |

@@ -63,14 +63,14 @@ class AiDetectionServiceTest {
     }
 
     @Test
-    @DisplayName("a scores-only multi-label result is stored with its station and capture, without a label")
+    @DisplayName("a scores-only multi-label result is stored with its station, pan direction and capture, without a label")
     void storesMultiLabelScores() {
         Map<String, BigDecimal> scores = Map.of(
                 "Leaf_N_stress", new BigDecimal("0.71"),
                 "Leaf_K_stress", new BigDecimal("0.64"));
 
         Optional<AiDetectionResponse> result = service.record("JETSON-01", new AiDetectionPayload(
-                null, null, "NUTRIENT_DEFICIENCY", null, null, null, null, scores, "ST-03", "cap-42", null));
+                null, null, "NUTRIENT_DEFICIENCY", null, null, null, null, scores, "ST-03", "barat", "cap-42", null));
 
         assertThat(result).isNotNull();
         ArgumentCaptor<AiDetection> captor = ArgumentCaptor.forClass(AiDetection.class);
@@ -79,6 +79,7 @@ class AiDetectionServiceTest {
         assertThat(saved.getLabel()).isNull();
         assertThat(saved.getScores()).contains("Leaf_N_stress");
         assertThat(saved.getStationCode()).isEqualTo("ST-03");
+        assertThat(saved.getPanDirection()).isEqualTo("BARAT");
         assertThat(saved.getCaptureId()).isEqualTo("cap-42");
     }
 
@@ -86,7 +87,7 @@ class AiDetectionServiceTest {
     @DisplayName("a result with neither a label nor scores is ignored")
     void rejectsEmptyResult() {
         Optional<AiDetectionResponse> result = service.record("JETSON-01", new AiDetectionPayload(
-                null, null, "NUTRIENT_DEFICIENCY", " ", null, null, null, Map.of(), "ST-03", null, null));
+                null, null, "NUTRIENT_DEFICIENCY", " ", null, null, null, Map.of(), "ST-03", null, null, null));
 
         assertThat(result).isEmpty();
         verify(detectionRepository, never()).save(any());

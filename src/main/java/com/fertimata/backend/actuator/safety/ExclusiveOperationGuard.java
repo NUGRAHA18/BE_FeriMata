@@ -12,9 +12,9 @@ import org.springframework.stereotype.Component;
 /**
  * Refuses to start an actuator while one of a conflicting type is running.
  *
- * <p>FERTIMATA Rev A asks for this between dosing and the camera trolley: together with the LED and
- * the pumps the DC bus approaches 100 W, and a trolley capture should not overlap a dosing cycle.
- * The groups are configuration.
+ * <p>FERTIMATA Rev A asks for this between dosing and the camera trolley, because the UPS only gives
+ * 4 A to the loads, and between dosing and the distribution pump, because the solution is still being
+ * mixed. The groups are configuration.
  *
  * <p>"Running" is the state the device last <em>reported</em>. A report can be stale, so this guard
  * narrows the window rather than closing it; the edge agent owns the hard sequencing.

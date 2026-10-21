@@ -2,6 +2,7 @@ package com.fertimata.backend.actuator.safety;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Objects;
 import java.util.Locale;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -27,6 +28,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *     letting the broker queue them
  * @param commandTtl how long a command stays valid on the wire; the edge agent must discard it after
  *     {@code expiresAt}. Null disables the expiry field
+ * @param blockedWhileActive one-directional exclusions: the listed types may not start while any of
+ *     the other types runs, but not the other way round
+ * @param signalInterlocks types refused unless a reported signal, such as a float switch, is in an
+ *     allowed state
  */
 @ConfigurationProperties(prefix = "app.actuator.safety")
 public record ActuatorSafetyProperties(
@@ -37,7 +42,9 @@ public record ActuatorSafetyProperties(
         List<List<String>> exclusiveTypeGroups,
         List<String> activeStates,
         boolean refuseWhenDeviceOffline,
-        Duration commandTtl) {
+        Duration commandTtl,
+        List<BlockedWhileActive> blockedWhileActive,
+        List<SignalInterlock> signalInterlocks) {
 
     public ActuatorSafetyProperties {
         activatingCommands = normalise(activatingCommands, List.of("ON"));
@@ -50,11 +57,17 @@ public record ActuatorSafetyProperties(
                 ? List.of()
                 : exclusiveTypeGroups.stream().map(group -> normalise(group, List.of())).toList();
         activeStates = normalise(activeStates, List.of("ON"));
+        blockedWhileActive = blockedWhileActive == null
+                ? List.of()
+                : blockedWhileActive.stream().filter(Objects::nonNull).toList();
+        signalInterlocks = signalInterlocks == null
+                ? List.of()
+                : signalInterlocks.stream().filter(Objects::nonNull).toList();
     }
 
     /** Settings with every guard inert; used where no configuration is bound, such as unit tests. */
     public static ActuatorSafetyProperties inert() {
-        return new ActuatorSafetyProperties(null, null, null, null, null, null, false, null);
+        return new ActuatorSafetyProperties(null, null, null, null, null, null, false, null, null, null);
     }
 
     public boolean isActivating(String command) {
@@ -81,5 +94,41 @@ public record ActuatorSafetyProperties(
                 .filter(value -> value != null && !value.isBlank())
                 .map(ActuatorSafetyProperties::key)
                 .toList();
+    }
+
+    /**
+     * @param types actuator types that are refused
+     * @param whileActive actuator types whose running state causes the refusal
+     */
+    public record BlockedWhileActive(List<String> types, List<String> whileActive) {
+
+        public BlockedWhileActive {
+            types = normalise(types, List.of());
+            whileActive = normalise(whileActive, List.of());
+        }
+    }
+
+    /**
+     * @param name interlock name reported to the operator, for example {@code FLOAT_LOW}
+     * @param device code of the device that reports the signal
+     * @param metricKey telemetry key of the signal on that device
+     * @param okValues reported values that allow the blocked types to run, compared case-insensitively;
+     *     a numeric reading is compared without trailing zeros, so {@code 1.000} matches {@code "1"}
+     * @param maxAge a reading older than this counts as missing; null accepts any age
+     * @param blockedTypes actuator types refused while the signal is not OK, missing or stale
+     */
+    public record SignalInterlock(
+            String name,
+            String device,
+            String metricKey,
+            List<String> okValues,
+            Duration maxAge,
+            List<String> blockedTypes) {
+
+        public SignalInterlock {
+            name = name == null || name.isBlank() ? "SIGNAL" : key(name);
+            okValues = normalise(okValues, List.of());
+            blockedTypes = normalise(blockedTypes, List.of());
+        }
     }
 }

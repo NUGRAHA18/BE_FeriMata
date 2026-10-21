@@ -20,6 +20,7 @@ public record AiDetectionResponse(
         @Schema(description = "Label to score map from a multi-label model, stored as reported")
                 Map<String, Object> scores,
         @Schema(example = "ST-01") String stationCode,
+        @Schema(example = "BARAT", description = "Camera direction at the station: TIMUR or BARAT") String panDirection,
         String captureId,
         String imageUrl,
         Map<String, Object> metadata,

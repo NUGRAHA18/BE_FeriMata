@@ -52,7 +52,10 @@ public class Plant extends AuditedEntity {
     @Column(name = "row_code", length = 16)
     private String rowCode;
 
-    /** Sensor tanah yang mewakili galon ini: A untuk {@code soil_a.*}, B untuk {@code soil_b.*}. */
+    /**
+     * Sensor tanah yang mewakili galon ini: A untuk {@code soil_a.*}. Rev A hanya punya satu sensor tanah,
+     * jadi kosong berarti A; kolom ini dipertahankan kalau kelak ada sensor kedua.
+     */
     @Column(name = "plot_code", length = 8)
     private String plotCode;
 
@@ -83,8 +86,12 @@ public class Plant extends AuditedEntity {
         this.name = name;
     }
 
-    /** Awalan metric key sensor tanah untuk galon ini, atau null bila plot belum ditentukan. */
+    /** Plot yang dipakai bila {@link #plotCode} kosong: satu-satunya sensor tanah Rev A. */
+    public static final String DEFAULT_PLOT_CODE = "A";
+
+    /** Awalan metric key sensor tanah untuk galon ini. */
     public String soilMetricPrefix() {
-        return plotCode == null || plotCode.isBlank() ? null : "soil_" + plotCode.trim().toLowerCase() + ".";
+        String plot = plotCode == null || plotCode.isBlank() ? DEFAULT_PLOT_CODE : plotCode.trim();
+        return "soil_" + plot.toLowerCase() + ".";
     }
 }

@@ -184,14 +184,11 @@ public class PlantService {
 
     /**
      * Pembacaan terakhir sensor tanah plot tanaman ini, sebagai {@code metricKey -> {value, unit, recordedAt}}.
-     * Kosong bila plot belum ditentukan atau belum ada pembacaan.
+     * Kosong bila belum ada pembacaan.
      */
     Map<String, Object> soilSnapshot(Plant plant) {
         String prefix = plant.soilMetricPrefix();
         Map<String, Object> snapshot = new LinkedHashMap<>();
-        if (prefix == null) {
-            return snapshot;
-        }
         for (SensorReading reading : sensorReadingRepository.findLatestPerSensor()) {
             if (!reading.getMetricKey().startsWith(prefix)) {
                 continue;

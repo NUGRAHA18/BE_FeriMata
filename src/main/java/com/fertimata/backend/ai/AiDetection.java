@@ -76,9 +76,13 @@ public class AiDetection extends BaseEntity {
     @Column(columnDefinition = "jsonb")
     private String scores;
 
-    /** Camera station the frame came from, for example {@code ST-01}. Free text: the count is not final. */
+    /** Camera station the frame came from, ST-01 to ST-10 on Rev A. Free text, so a new layout needs no migration. */
     @Column(name = "station_code", length = 32)
     private String stationCode;
+
+    /** Which way the camera faced at that station: TIMUR or BARAT on Rev A. Stored as reported, upper-cased. */
+    @Column(name = "pan_direction", length = 16)
+    private String panDirection;
 
     /** Groups every result produced from one capture run or frame. */
     @Column(name = "capture_id", length = 64)

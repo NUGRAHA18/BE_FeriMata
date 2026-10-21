@@ -11,6 +11,7 @@ import com.fertimata.backend.plant.PlantRepository;
 import com.fertimata.backend.websocket.RealtimeEventPublisher;
 import com.fertimata.backend.websocket.RealtimeEventType;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,6 +81,8 @@ public class AiDetectionService {
         detection.setLabel(hasLabel ? truncate(payload.label().trim(), 128) : null);
         detection.setScores(hasScores ? jsonSupport.toJson(payload.scores()) : null);
         detection.setStationCode(blankToNull(payload.stationCode(), 32));
+        String panDirection = blankToNull(payload.panDirection(), 16);
+        detection.setPanDirection(panDirection == null ? null : panDirection.toUpperCase(Locale.ROOT));
         detection.setCaptureId(blankToNull(payload.captureId(), 64));
         detection.setConfidence(payload.confidence());
         detection.setImageUrl(payload.imageUrl());

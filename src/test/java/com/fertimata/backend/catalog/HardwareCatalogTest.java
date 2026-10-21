@@ -64,13 +64,35 @@ class HardwareCatalogTest {
                 .containsExactly("JETSON-01", "PZEM-01", "PANEL-01", "GREENHOUSE-01", "RIO-TANK-01");
         long sensors = catalog.devices().stream().mapToLong(d -> d.sensors().size()).sum();
         long actuators = catalog.devices().stream().mapToLong(d -> d.actuators().size()).sum();
-        assertThat(sensors).isEqualTo(4 + 6 + 17 + 4);
-        // Relay 20 R0-R3 and relay 21 R0-R4.
+        // One soil sensor (7 values), SHT40 (2), light, and EC, pH, water temperature and float LOW at the tank.
+        assertThat(sensors).isEqualTo(4 + 6 + 10 + 4);
+        // Relay 20 R0-R3, relay 21 R0-R2, R4 and R5.
         assertThat(actuators).isEqualTo(9);
 
         HardwareCatalogProperties.ActuatorEntry dosingN = catalog.devices().get(4).actuators().get(0);
         assertThat(dosingN.metadata()).containsEntry("modbusAddress", "21").containsEntry("channel", "R0");
-        assertThat(catalog.devices().get(2).actuators().get(2).maxRunSeconds()).isEqualTo(120);
+        assertThat(dosingN.maxRunSeconds()).isEqualTo(120);
+        HardwareCatalogProperties.ActuatorEntry pan = catalog.devices().get(2).actuators().get(1);
+        assertThat(pan.type()).isEqualTo("CAMERA_PAN");
+        assertThat(pan.metadata()).containsEntry("channel", "R1");
+        assertThat(catalog.devices().get(2).actuators().get(2).maxRunSeconds()).isEqualTo(60);
+        assertThat(catalog.devices().get(1).metadata()).containsEntry("modbusAddress", "30");
+
+        // Every type that must be timed carries its own ceiling, since Rev A has no mechanical timer.
+        ActuatorSafetyProperties safety =
+                binder.bind("app.actuator.safety", ActuatorSafetyProperties.class).get();
+        catalog.devices().stream()
+                .flatMap(device -> device.actuators().stream())
+                .filter(actuator -> safety.timedTypes().contains(actuator.type()))
+                .forEach(actuator -> assertThat(actuator.maxRunSeconds()).as(actuator.code()).isNotNull());
+
+        // A signal interlock pointing at a sensor the catalog never creates would block its pumps forever.
+        safety.signalInterlocks().forEach(signal -> assertThat(catalog.devices().stream()
+                        .filter(device -> device.code().equals(signal.device()))
+                        .flatMap(device -> device.sensors().stream())
+                        .map(HardwareCatalogProperties.SensorEntry::metricKey))
+                .as(signal.name())
+                .contains(signal.metricKey()));
     }
 
     @Test
@@ -105,10 +127,27 @@ class HardwareCatalogTest {
         assertThat(safety.activatingCommands()).containsExactly("ON");
         assertThat(safety.activeStates()).containsExactly("ON");
         assertThat(safety.isActivating("on")).isTrue();
-        assertThat(safety.timedTypes()).contains("DOSING_PUMP", "TROLLEY_MOTOR", "FILL_VALVE");
-        assertThat(safety.blockedOnBackupPowerTypes()).containsExactly("DOSING_PUMP", "SAMPLING_PUMP", "TROLLEY_MOTOR");
-        assertThat(safety.exclusiveTypeGroups())
-                .containsExactly(List.of("DOSING_PUMP", "TROLLEY_MOTOR"), List.of("DOSING_PUMP", "ILLUMINATION"));
+        assertThat(safety.timedTypes())
+                .containsExactly("DISTRIBUTION_PUMP", "TROLLEY_MOTOR", "DOSING_PUMP", "STIRRER");
+        assertThat(safety.blockedOnBackupPowerTypes())
+                .containsExactly("DOSING_PUMP", "STIRRER", "TROLLEY_MOTOR", "DISTRIBUTION_PUMP");
+        assertThat(safety.exclusiveTypeGroups()).containsExactly(
+                List.of("DOSING_PUMP", "TROLLEY_MOTOR"),
+                List.of("STIRRER", "TROLLEY_MOTOR"),
+                List.of("DOSING_PUMP", "DISTRIBUTION_PUMP"),
+                List.of("STIRRER", "DISTRIBUTION_PUMP"));
+        assertThat(safety.blockedWhileActive()).singleElement().satisfies(rule -> {
+            assertThat(rule.types()).containsExactly("CAMERA_PAN");
+            assertThat(rule.whileActive()).containsExactly("TROLLEY_MOTOR");
+        });
+        assertThat(safety.signalInterlocks()).singleElement().satisfies(signal -> {
+            assertThat(signal.name()).isEqualTo("FLOAT_LOW");
+            assertThat(signal.device()).isEqualTo("RIO-TANK-01");
+            assertThat(signal.metricKey()).isEqualTo("tank.float_low_ok");
+            assertThat(signal.okValues()).contains("1");
+            assertThat(signal.maxAge()).isEqualTo(java.time.Duration.ofMinutes(10));
+            assertThat(signal.blockedTypes()).containsExactly("DISTRIBUTION_PUMP", "DOSING_PUMP", "STIRRER");
+        });
         assertThat(power.isNormal("mains")).isTrue();
         assertThat(power.isNormal("UNKNOWN")).isFalse();
     }

@@ -57,10 +57,10 @@ app:
           metrics:
             - { key: mains.voltage, min: 215, max: 228, scale: 1 }
             - { key: mains.frequency, min: 49.9, max: 50.1, scale: 1 }
-            - { key: pump.current, min: 0, max: 0, scale: 3 }
-            - { key: pump.power, min: 0, max: 0, scale: 1 }
-            - { key: pump.energy, min: 1.2, max: 1.3, scale: 3 }
-            - { key: pump.power_factor, min: 0, max: 0, scale: 2 }
+            - { key: mains.current, min: 0.28, max: 0.32, scale: 3 }
+            - { key: mains.power, min: 55, max: 65, scale: 1 }
+            - { key: mains.energy, min: 1.2, max: 1.3, scale: 3 }
+            - { key: mains.power_factor, min: 0.85, max: 0.9, scale: 2 }
         - code: PANEL-01
         - code: GREENHOUSE-01
           metrics:
@@ -71,13 +71,6 @@ app:
             - { key: soil_a.nitrogen, min: 40, max: 90, scale: 0 }
             - { key: soil_a.phosphorus, min: 15, max: 40, scale: 0 }
             - { key: soil_a.potassium, min: 60, max: 140, scale: 0 }
-            - { key: soil_b.moisture, min: 55, max: 75, scale: 1 }
-            - { key: soil_b.temperature, min: 25, max: 30, scale: 1 }
-            - { key: soil_b.ec, min: 900, max: 1600, scale: 0 }
-            - { key: soil_b.ph, min: 6.0, max: 6.8, scale: 2 }
-            - { key: soil_b.nitrogen, min: 40, max: 90, scale: 0 }
-            - { key: soil_b.phosphorus, min: 15, max: 40, scale: 0 }
-            - { key: soil_b.potassium, min: 60, max: 140, scale: 0 }
             - { key: air.temperature, min: 26, max: 34, scale: 1 }
             - { key: air.humidity, min: 60, max: 85, scale: 1 }
             - { key: light.illuminance, min: 8000, max: 40000, scale: 0 }
@@ -85,8 +78,9 @@ app:
           metrics:
             - { key: tank.ec, min: 1.5, max: 2.0, scale: 2 }
             - { key: tank.ph, min: 5.8, max: 6.4, scale: 2 }
-            - { key: tank.supply_float, min: 1, max: 1, scale: 0 }
-            - { key: tank.mixing_float, min: 1, max: 1, scale: 0 }
+            - { key: tank.water_temperature, min: 25, max: 29, scale: 1 }
+            # 1 = air cukup. Set ke 0 untuk mencoba interlock FLOAT_LOW (pompa distribusi, dosing, aduk diblokir).
+            - { key: tank.float_low_ok, min: 1, max: 1, scale: 0 }
 
 logging:
   level:

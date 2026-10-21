@@ -30,6 +30,7 @@ public class AiDetectionMapper {
                 detection.getConfidence(),
                 detection.getScores() == null ? null : jsonSupport.toMap(detection.getScores()),
                 detection.getStationCode(),
+                detection.getPanDirection(),
                 detection.getCaptureId(),
                 detection.getImageUrl(),
                 jsonSupport.toMap(detection.getMetadata()),

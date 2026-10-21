@@ -12,7 +12,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>An actuator must carry a run time when its type is listed in {@code timed-types} or when it has
  * its own {@code maxRunSeconds}; the value must then be a whole number of seconds within that limit.
- * This mirrors the relay's timed-on mode, so an output switches itself off even if the Jetson hangs.
+ * Rev A has no mechanical timer relay, so this limit, together with the edge agent's own watchdog, is
+ * what keeps an output from running on when its OFF never arrives.
  */
 @Component
 @Order(10)
