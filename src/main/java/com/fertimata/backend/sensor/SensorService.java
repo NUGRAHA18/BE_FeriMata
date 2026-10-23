@@ -1,5 +1,6 @@
 package com.fertimata.backend.sensor;
 
+import com.fertimata.backend.calibration.ReadingCalibrator;
 import com.fertimata.backend.common.exception.BusinessRuleException;
 import com.fertimata.backend.common.exception.ResourceNotFoundException;
 import com.fertimata.backend.common.response.PageResponse;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,18 +38,21 @@ public class SensorService {
     private final DeviceService deviceService;
     private final TelemetryProperties telemetryProperties;
     private final JsonSupport jsonSupport;
+    private final ReadingCalibrator readingCalibrator;
 
     public SensorService(
             SensorRepository sensorRepository,
             SensorReadingRepository sensorReadingRepository,
             DeviceService deviceService,
             TelemetryProperties telemetryProperties,
-            JsonSupport jsonSupport) {
+            JsonSupport jsonSupport,
+            ReadingCalibrator readingCalibrator) {
         this.sensorRepository = sensorRepository;
         this.sensorReadingRepository = sensorReadingRepository;
         this.deviceService = deviceService;
         this.telemetryProperties = telemetryProperties;
         this.jsonSupport = jsonSupport;
+        this.readingCalibrator = readingCalibrator;
     }
 
     @Transactional(readOnly = true)
@@ -167,7 +172,7 @@ public class SensorService {
         require(sensorId);
         return sensorReadingRepository
                 .findFirstBySensorIdOrderByRecordedAtDescIdDesc(sensorId)
-                .map(SensorReadingResponse::from)
+                .map(readingCalibrator::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Latest reading for sensor", sensorId));
     }
 
@@ -179,18 +184,17 @@ public class SensorService {
         if (start.isAfter(end)) {
             throw new BusinessRuleException("The start of the range must not be after its end");
         }
-        return PageResponse.from(
-                sensorReadingRepository.findBySensorIdAndRecordedAtBetweenOrderByRecordedAtDesc(
-                        sensorId, start, end, pageable),
-                SensorReadingResponse::from);
+        Page<SensorReading> page = sensorReadingRepository.findBySensorIdAndRecordedAtBetweenOrderByRecordedAtDesc(
+                sensorId, start, end, pageable);
+        // Dikoreksi per halaman, bukan per baris: kovariat satu halaman diambil dengan satu query.
+        List<SensorReadingResponse> content = readingCalibrator.toResponses(page.getContent());
+        return PageResponse.of(page, content);
     }
 
     /** Latest value of every sensor, in one query, for the dashboard. */
     @Transactional(readOnly = true)
     public List<SensorReadingResponse> latestPerSensor() {
-        return sensorReadingRepository.findLatestPerSensor().stream()
-                .map(SensorReadingResponse::from)
-                .toList();
+        return readingCalibrator.toResponses(sensorReadingRepository.findLatestPerSensor());
     }
 
     @Transactional(readOnly = true)
@@ -205,6 +209,11 @@ public class SensorService {
 
     /** Exposed for the ingestion pipeline, which already holds a managed reading. */
     public SensorReadingResponse toResponse(SensorReading reading) {
-        return SensorReadingResponse.from(reading);
+        return readingCalibrator.toResponse(reading);
+    }
+
+    /** Satu pesan telemetri sekaligus, supaya kovariat kalibrasi diambil dari pesan yang sama. */
+    public List<SensorReadingResponse> toResponses(List<SensorReading> readings) {
+        return readingCalibrator.toResponses(readings);
     }
 }

@@ -244,8 +244,7 @@ public class TelemetryIngestService {
         if (readings.isEmpty()) {
             return;
         }
-        List<SensorReadingResponse> payload =
-                readings.stream().map(SensorReadingResponse::from).toList();
+        List<SensorReadingResponse> payload = sensorService.toResponses(readings);
         realtimeEventPublisher.publish(
                 RealtimeEventType.SENSOR_READING_UPDATED,
                 new TelemetryUpdate(device.getId(), device.getDeviceCode(), recordedAt, payload));

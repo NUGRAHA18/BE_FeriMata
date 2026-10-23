@@ -1,6 +1,8 @@
 package com.fertimata.backend.plant;
 
 import com.fertimata.backend.common.response.PageResponse;
+import com.fertimata.backend.plant.dto.HarvestRequest;
+import com.fertimata.backend.plant.dto.HarvestResponse;
 import com.fertimata.backend.plant.dto.PlantObservationRequest;
 import com.fertimata.backend.plant.dto.PlantObservationResponse;
 import com.fertimata.backend.plant.dto.PlantRequest;
@@ -39,10 +41,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class PlantController {
 
     private final PlantService plantService;
+    private final HarvestService harvestService;
     private final CurrentUserProvider currentUserProvider;
 
-    public PlantController(PlantService plantService, CurrentUserProvider currentUserProvider) {
+    public PlantController(
+            PlantService plantService, HarvestService harvestService, CurrentUserProvider currentUserProvider) {
         this.plantService = plantService;
+        this.harvestService = harvestService;
         this.currentUserProvider = currentUserProvider;
     }
 
@@ -104,6 +109,22 @@ public class PlantController {
             @PathVariable Long id, @Valid @RequestBody PlantObservationRequest request) {
         PlantObservationResponse created =
                 plantService.addObservation(id, request, currentUserProvider.username().orElse(null));
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @GetMapping("/{id}/harvests")
+    @Operation(summary = "Harvested fruits of a plant, newest first")
+    public List<HarvestResponse> harvests(@PathVariable Long id) {
+        return harvestService.forPlant(id);
+    }
+
+    @PostMapping("/{id}/harvests")
+    @PreAuthorize("hasRole('" + Role.Names.OPERATOR + "')")
+    @Operation(
+            summary = "Record a harvested fruit",
+            description = "Protokol-Data.md §6: weight, °Brix, firmness, flesh thickness, dry matter. One record per fruit.")
+    public ResponseEntity<HarvestResponse> harvest(@PathVariable Long id, @Valid @RequestBody HarvestRequest request) {
+        HarvestResponse created = harvestService.add(id, request, currentUserProvider.username().orElse(null));
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 }

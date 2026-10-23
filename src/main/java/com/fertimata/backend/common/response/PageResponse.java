@@ -24,4 +24,10 @@ public record PageResponse<T>(
                 page.getTotalPages(),
                 page.isLast());
     }
+
+    /** Untuk pemetaan yang bekerja per halaman (mis. butuh satu query tambahan untuk seluruh isi halaman). */
+    public static <T> PageResponse<T> of(Page<?> page, List<T> content) {
+        return new PageResponse<>(
+                content, page.getNumber(), page.getSize(), page.getTotalElements(), page.getTotalPages(), page.isLast());
+    }
 }

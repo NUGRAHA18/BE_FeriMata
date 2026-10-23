@@ -83,6 +83,30 @@ public class AlertService {
         raise(request);
     }
 
+    /** Seperti {@link #raiseOnceForDevice}, tetapi per sensor (mis. pengingat uji drift). */
+    @Transactional
+    public boolean raiseOnceForSensor(NewAlert request) {
+        Long sensorId = request.relatedSensor() == null ? null : request.relatedSensor().getId();
+        if (sensorId != null
+                && alertRepository.existsByTypeAndRelatedSensorIdAndAcknowledgedFalse(request.type(), sensorId)) {
+            return false;
+        }
+        raise(request);
+        return true;
+    }
+
+    /** Seperti {@link #raiseOnceForDevice}, tetapi per aktuator (mis. pengingat kalibrasi pompa). */
+    @Transactional
+    public boolean raiseOnceForActuator(NewAlert request) {
+        Long actuatorId = request.relatedActuator() == null ? null : request.relatedActuator().getId();
+        if (actuatorId != null
+                && alertRepository.existsByTypeAndRelatedActuatorIdAndAcknowledgedFalse(request.type(), actuatorId)) {
+            return false;
+        }
+        raise(request);
+        return true;
+    }
+
     /**
      * Daftar alert, terbaru dulu. Setiap filter opsional dan bisa digabung.
      *

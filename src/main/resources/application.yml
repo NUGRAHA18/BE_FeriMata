@@ -118,6 +118,31 @@ app:
       - { code: YOUNG_FRUIT, name: Buah muda, start-hst: 25, end-hst: 44, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 4.1, ratio-p: 1, ratio-k: 7.9, notes: "N turun, K naik - fase penentu Brix" }
       - { code: FRUIT_ENLARGEMENT, name: Pembesaran buah, start-hst: 45, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 5.4, ratio-p: 1, ratio-k: 4.7 }
 
+  calibration:
+    # Nilai sensor/tegangan yang diisi otomatis (sampel lab, uji drift, kalibrasi pompa) tidak boleh lebih tua dari ini.
+    reading-max-age: ${CALIBRATION_READING_MAX_AGE:15m}
+    voltage-metric-key: mains.voltage
+    # Protokol-Data.md s7 langkah 5: probe EC/pH dicek dengan larutan standar tiap minggu.
+    drift-check:
+      metric-keys: [tank.ec, tank.ph, soil_a.ec, soil_a.ph]
+      max-age: ${CALIBRATION_DRIFT_MAX_AGE:7d}
+    # Protokol-Data.md s8: debit pompa peristaltik, minimal 3 ulangan, rekalibrasi bulanan.
+    pump:
+      types: [DOSING_PUMP]
+      max-age: ${CALIBRATION_PUMP_MAX_AGE:30d}
+      min-trials: 3
+    reminders:
+      enabled: ${CALIBRATION_REMINDERS_ENABLED:true}
+      interval: 6h
+      initial-delay: 5m
+
+  metrics:
+    # TODO(hardware): interval kirim telemetri edge agent. Dasar "pesan yang diharapkan" di /api/metrics/system.
+    expected-telemetry-interval: ${METRICS_EXPECTED_TELEMETRY_INTERVAL:30s}
+    uptime-bucket: ${METRICS_UPTIME_BUCKET:5m}
+    max-range: 92d
+    energy-metric-key: mains.energy
+
   security:
     jwt:
       # Sengaja nggak dikasih default: secret buat signing yang udah ikut di-ship sama aja artinya nggak ada authentication.

@@ -1,6 +1,7 @@
 package com.fertimata.backend.telemetry.domain;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -39,6 +40,25 @@ public interface SensorReadingRepository extends JpaRepository<SensorReading, Lo
     List<SensorReading> findLatestPerSensor();
 
     long countByReceivedAtAfter(Instant since);
+
+    /** Pembacaan kovariat kalibrasi: metrik lain dari pesan telemetri yang sama (device + recordedAt sama). */
+    List<SensorReading> findByDeviceIdAndMetricKeyInAndRecordedAtIn(
+            Long deviceId, Collection<String> metricKeys, Collection<Instant> recordedAt);
+
+    /** Pembacaan pertama dan terakhir sebuah metrik dalam rentang; dipakai untuk selisih energi kumulatif. */
+    Optional<SensorReading> findFirstByMetricKeyAndRecordedAtBetweenOrderByRecordedAtAsc(
+            String metricKey, Instant from, Instant to);
+
+    Optional<SensorReading> findFirstByMetricKeyAndRecordedAtBetweenOrderByRecordedAtDesc(
+            String metricKey, Instant from, Instant to);
+
+    /** Semua metrik dari satu pesan telemetri; dipakai sebagai kovariat sampel kalibrasi. */
+    List<SensorReading> findByDeviceIdAndRecordedAt(Long deviceId, Instant recordedAt);
+
+    /** Pembacaan terdekat sebelum/pada suatu waktu; dipakai mengisi nilai sensor pada sampel lab. */
+    Optional<SensorReading> findFirstBySensorIdAndRecordedAtLessThanEqualOrderByRecordedAtDesc(Long sensorId, Instant at);
+
+    Optional<SensorReading> findFirstByMetricKeyAndRecordedAtLessThanEqualOrderByRecordedAtDesc(String metricKey, Instant at);
 
     /**
      * Menghapus paling banyak {@code batchSize} pembacaan yang lebih tua dari {@code cutoff}.

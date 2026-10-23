@@ -28,6 +28,12 @@ public final class AlertType {
     /** A device that reported backup power reports a normal supply again. */
     public static final String POWER_RESTORED = "POWER_RESTORED";
 
+    /** A sensor in the drift-check list has not been checked against a standard solution recently. */
+    public static final String DRIFT_CHECK_DUE = "DRIFT_CHECK_DUE";
+
+    /** A dosing pump's flow calibration is missing or older than the recalibration interval. */
+    public static final String PUMP_CALIBRATION_DUE = "PUMP_CALIBRATION_DUE";
+
     /**
      * Fallback type for a device-reported alert that did not name one.
      *

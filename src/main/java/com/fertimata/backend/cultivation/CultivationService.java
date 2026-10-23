@@ -11,6 +11,7 @@ import com.fertimata.backend.cultivation.dto.PlantingCycleUpdateRequest;
 import com.fertimata.backend.plant.PlantRepository;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -99,7 +100,16 @@ public class CultivationService {
 
     /** HST hari ini untuk siklus tertentu, dipakai saat mencatat pengamatan. */
     public long hstToday(PlantingCycle cycle) {
-        return cycle.hstOn(LocalDate.now(clock.withZone(properties.zone())));
+        return cycle.hstOn(today());
+    }
+
+    /** Tanggal hari ini di zona greenhouse. */
+    public LocalDate today() {
+        return LocalDate.now(clock.withZone(properties.zone()));
+    }
+
+    public ZoneId zone() {
+        return properties.zone();
     }
 
     @Transactional

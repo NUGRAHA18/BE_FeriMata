@@ -1,6 +1,7 @@
 package com.fertimata.backend.common.util;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.type.TypeReference;
@@ -19,6 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 public class JsonSupport {
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
+    private static final TypeReference<List<Object>> LIST_TYPE = new TypeReference<>() {};
 
     private final ObjectMapper objectMapper;
 
@@ -38,6 +40,15 @@ public class JsonSupport {
         }
         Map<String, Object> parsed = objectMapper.readValue(json, MAP_TYPE);
         return parsed == null ? Map.of() : Collections.unmodifiableMap(parsed);
+    }
+
+    /** Parses a JSON array, returning an empty list for null/blank input. */
+    public List<Object> toList(String json) {
+        if (json == null || json.isBlank()) {
+            return List.of();
+        }
+        List<Object> parsed = objectMapper.readValue(json, LIST_TYPE);
+        return parsed == null ? List.of() : Collections.unmodifiableList(parsed);
     }
 
     public JsonNode readTree(String json) {

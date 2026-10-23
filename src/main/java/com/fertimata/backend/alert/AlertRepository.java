@@ -15,6 +15,10 @@ public interface AlertRepository extends JpaRepository<Alert, Long>, JpaSpecific
     /** Used to avoid raising the same infrastructure alert again while it is still unacknowledged. */
     boolean existsByTypeAndRelatedDeviceIdAndAcknowledgedFalse(String type, Long deviceId);
 
+    boolean existsByTypeAndRelatedSensorIdAndAcknowledgedFalse(String type, Long sensorId);
+
+    boolean existsByTypeAndRelatedActuatorIdAndAcknowledgedFalse(String type, Long actuatorId);
+
     @Query("select a from Alert a where a.acknowledged = false order by a.severity desc, a.createdAt desc")
     List<Alert> findActive(Pageable pageable);
 }

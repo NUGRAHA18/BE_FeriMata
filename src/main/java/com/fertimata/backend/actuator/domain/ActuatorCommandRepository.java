@@ -1,6 +1,7 @@
 package com.fertimata.backend.actuator.domain;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,4 +18,8 @@ public interface ActuatorCommandRepository extends JpaRepository<ActuatorCommand
     Page<ActuatorCommand> findRecent(Pageable pageable);
 
     long countByStatusAndRequestedAtAfter(CommandStatus status, Instant since);
+
+    /** Perintah yang benar-benar dijalankan perangkat, urut waktu eksekusi; dasar hitung volume pupuk. */
+    List<ActuatorCommand> findByActuatorIdAndStatusAndExecutedAtBetweenOrderByExecutedAtAsc(
+            Long actuatorId, CommandStatus status, Instant from, Instant to);
 }
