@@ -6,6 +6,7 @@ import com.fertimata.backend.actuator.dto.ActuatorRegistrationRequest;
 import com.fertimata.backend.actuator.dto.ActuatorResponse;
 import com.fertimata.backend.actuator.dto.ActuatorStatusResponse;
 import com.fertimata.backend.actuator.dto.ActuatorUpdateRequest;
+import com.fertimata.backend.actuator.safety.CommandVocabularyProperties;
 import com.fertimata.backend.common.exception.BusinessRuleException;
 import com.fertimata.backend.common.exception.ResourceNotFoundException;
 import com.fertimata.backend.common.util.JsonSupport;
@@ -32,22 +33,25 @@ public class ActuatorService {
     private final DeviceService deviceService;
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final JsonSupport jsonSupport;
+    private final CommandVocabularyProperties vocabulary;
 
     public ActuatorService(
             ActuatorRepository actuatorRepository,
             DeviceService deviceService,
             RealtimeEventPublisher realtimeEventPublisher,
-            JsonSupport jsonSupport) {
+            JsonSupport jsonSupport,
+            CommandVocabularyProperties vocabulary) {
         this.actuatorRepository = actuatorRepository;
         this.deviceService = deviceService;
         this.realtimeEventPublisher = realtimeEventPublisher;
         this.jsonSupport = jsonSupport;
+        this.vocabulary = vocabulary;
     }
 
     @Transactional(readOnly = true)
     public List<ActuatorResponse> list() {
         return actuatorRepository.findAllWithDevice().stream()
-                .map(ActuatorResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -55,13 +59,13 @@ public class ActuatorService {
     public List<ActuatorResponse> listByDevice(Long deviceId) {
         deviceService.require(deviceId);
         return actuatorRepository.findByDeviceIdOrderByCodeAsc(deviceId).stream()
-                .map(ActuatorResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public ActuatorResponse get(Long id) {
-        return ActuatorResponse.from(require(id));
+        return toResponse(require(id));
     }
 
     @Transactional(readOnly = true)
@@ -91,7 +95,7 @@ public class ActuatorService {
         actuator.setMetadata(jsonSupport.toJson(request.metadata()));
         Actuator saved = actuatorRepository.save(actuator);
         log.info("Actuator registered: {} on device {}", saved.getCode(), device.getDeviceCode());
-        return ActuatorResponse.from(saved);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -121,7 +125,7 @@ public class ActuatorService {
                 actuator.getDevice().getDeviceCode(),
                 actuator.isEnabled(),
                 actuator.getMaxRunSeconds());
-        return ActuatorResponse.from(actuator);
+        return toResponse(actuator);
     }
 
     /**
@@ -161,5 +165,9 @@ public class ActuatorService {
     @Transactional(readOnly = true)
     public long countAll() {
         return actuatorRepository.count();
+    }
+
+    private ActuatorResponse toResponse(Actuator actuator) {
+        return ActuatorResponse.from(actuator, vocabulary.commandsFor(actuator.getType()));
     }
 }

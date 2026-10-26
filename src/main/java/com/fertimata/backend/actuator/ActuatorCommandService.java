@@ -153,8 +153,8 @@ public class ActuatorCommandService {
                     "Actuator %s is disabled and cannot accept commands".formatted(actuator.getCode()),
                     Map.of("actuatorCode", actuator.getCode()));
         }
-        // The command vocabulary belongs to the device, so the name is not checked against a list
-        // here. Run-time limits, power and exclusivity interlocks are configuration-driven guards.
+        // The command vocabulary, run-time limits, power and exclusivity interlocks are all
+        // configuration-driven guards keyed by actuator type; none of them is named here.
         safetyPolicy.check(actuator, request.command(), parameters);
         if (actuator.getDevice().getStatus() != DeviceStatus.ONLINE) {
             // Not an error by default: the broker holds the message and the wire expiry bounds how

@@ -102,8 +102,15 @@ services:
       BOOTSTRAP_OPERATOR_PASSWORD: ${BOOTSTRAP_OPERATOR_PASSWORD:?BOOTSTRAP_OPERATOR_PASSWORD is required}
       BOOTSTRAP_OPERATOR_FULL_NAME: ${BOOTSTRAP_OPERATOR_FULL_NAME:-Field Operator}
 
+      # Trolley photos written by the edge agent on the host, served read-only at /captures/**.
+      CAPTURES_DIR: /captures
+
       LOG_LEVEL_APP: ${LOG_LEVEL_APP:-INFO}
       JAVA_OPTS: -XX:MaxRAMPercentage=75.0
+    volumes:
+      # The edge agent's camera.root (WorkingDirectory /var/lib/fertimata + data/citra). Read-only: the
+      # backend never writes or deletes photos.
+      - ${CAPTURES_HOST_DIR:-/var/lib/fertimata/data/citra}:/captures:ro
     # The 8 GB are shared with inference; the JVM heap follows this limit.
     mem_limit: ${BACKEND_MEM_LIMIT:-1g}
 

@@ -60,6 +60,20 @@ app:
             type: TEMPERATURE
             unit: C
             description: Panel tanpa fan; Jetson hanya aman pada suhu lingkungan 0-35 C.
+        # Aktuator VIRTUAL (keputusan D2): satu perintah memicu urutan yang dijalankan edge agent, karena
+        # langkahnya cepat dan harus tetap aman walau backend mati. Relay mentah di PANEL-01 tetap ada
+        # untuk servis manual. Tanpa max-run-seconds: batas waktunya dijaga edge (patroli kira-kira 3 menit).
+        # Edge mengirim ACK saat urutan DIMULAI (state ON), lalu state OFF di pesan status saat selesai atau
+        # batal; hasilnya dilaporkan lewat alert INFO/WARNING.
+        actuators:
+          - code: TROLLEY-PATROL
+            name: Patroli kamera
+            type: TROLLEY_PATROL
+            description: START = jalan dari HOME ke stasiun 10 sambil memotret, lalu kembali. Jadwal malam tetap di edge.
+          - code: TROLLEY-GOTO
+            name: Pindah trolley ke stasiun
+            type: TROLLEY_POSITION
+            description: HOME = kembali ke limit selatan; GOTO_STATION dengan parameter station 1-10.
 
       # ---------------------------------------------------------------------------------------------
       - code: PZEM-01
@@ -194,12 +208,37 @@ app:
             metadata:
               modbusAddress: "21"
               channel: IN1
+          # Catatan per iterasi loop dosing (Protokol Data, laporan riset). Dikirim edge hanya saat loop
+          # berjalan, jadi jarang ada datanya - bukan tanda sensor rusak.
+          - { code: DOSING-ITERATION, metric-key: dosing.iteration, name: Iterasi dosing, type: DOSING_ITERATION, description: "Nomor iterasi loop dosing, mulai 1." }
+          - { code: DOSING-EC-TARGET, metric-key: dosing.ec_target, name: EC target dosing, type: DOSING_EC, unit: mS/cm }
+          - { code: DOSING-EC-MEASURED, metric-key: dosing.ec_measured, name: EC terukur saat dosing, type: DOSING_EC, unit: mS/cm, description: "EC larutan setelah aduk pada iterasi ini." }
+          - { code: DOSING-N-ML, metric-key: dosing.n_ml, name: Volume pupuk N per iterasi, type: DOSED_VOLUME, unit: ml }
+          - { code: DOSING-P-ML, metric-key: dosing.p_ml, name: Volume pupuk P per iterasi, type: DOSED_VOLUME, unit: ml }
+          - { code: DOSING-K-ML, metric-key: dosing.k_ml, name: Volume pupuk K per iterasi, type: DOSED_VOLUME, unit: ml }
         actuators:
           - { code: DOSING-N, name: Pompa dosing N (Calnit), type: DOSING_PUMP, max-run-seconds: 120, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R0 } }
           - { code: DOSING-P, name: Pompa dosing P (MKP), type: DOSING_PUMP, max-run-seconds: 120, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R1 } }
           - { code: DOSING-K, name: Pompa dosing K (SOP), type: DOSING_PUMP, max-run-seconds: 120, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R2 } }
           - { code: STIRRER, name: Pompa aduk drum, type: STIRRER, max-run-seconds: 600, description: "BLDC 24 V 22 W, menyala selama dosing + waktu aduk.", metadata: { modbusAddress: "21", channel: R4 } }
           - { code: EC-POWER, name: Daya papan EC, type: SENSOR_POWER, description: "Harus OFF saat membaca pH. Diurutkan oleh edge agent.", metadata: { modbusAddress: "21", channel: R5 } }
+          # Aktuator VIRTUAL (D2): loop dosing tertutup berbasis EC (§8.2) yang dijalankan edge. Batasnya
+          # max_iterations di config edge; DOSING_NOT_CONVERGING dikirim sebagai alert bila tidak tercapai.
+          - code: DOSING-LOOP
+            name: Dosing otomatis ke target EC
+            type: DOSING_LOOP
+            description: DOSE_TO_TARGET dengan targetEc (mS/cm) dan phase; dosis N/P/K dan aduk diatur edge.
+
+  metrics:
+    # D4: interval kirim telemetri per device, salinan `polling` di config edge (§4.6). Edge mengirim satu pesan
+    # per kelompok polling, jadi device dengan beberapa kelompok mencantumkan semuanya; "pesan yang diharapkan"
+    # di /api/metrics/system adalah jumlahnya. PANEL-01 tidak mengirim telemetri (state relay lewat status).
+    # Metrik dosing.* hanya muncul saat loop dosing jalan dan tidak ikut dihitung.
+    device-intervals:
+      - { device: JETSON-01, intervals: [30s, 60s] }           # trolley_s, soc_s
+      - { device: PZEM-01, intervals: [3s] }                   # pzem_s
+      - { device: GREENHOUSE-01, intervals: [60s, 300s] }      # air_light_s, soil_s
+      - { device: RIO-TANK-01, intervals: [5s, 600s] }         # float (relays_s); EC, pH dan suhu larutan dalam satu pesan (tank_s)
 
   power:
     # Values the edge agent reports in the status message's powerSource field. Anything else counts as
@@ -210,24 +249,40 @@ app:
   actuator:
     safety:
       # Quoted on purpose: unquoted ON is the boolean true in YAML 1.1 and would bind as "TRUE".
-      activating-commands: ["ON"]
+      # START/HOME/GOTO_STATION/DOSE_TO_TARGET menyalakan aktuator virtual. STOP dan OFF bukan
+      # perintah aktivasi, jadi TIDAK PERNAH diblokir interlock.
+      activating-commands: ["ON", "START", "HOME", "GOTO_STATION", "DOSE_TO_TARGET"]
       duration-parameter: durationSeconds
       # §5.4: tidak ada timer mekanis lagi, jadi tiap output yang bisa jalan terus wajib punya durasi.
       # Batas per actuator ada di max-run-seconds di atas (atau PATCH /api/actuators/{id}).
+      # Tipe virtual (TROLLEY_PATROL, TROLLEY_POSITION, DOSING_LOOP) sengaja tidak di sini: durasinya dijaga edge.
       timed-types: [DISTRIBUTION_PUMP, TROLLEY_MOTOR, DOSING_PUMP, STIRRER]
       # §7.4 PLN padam: hentikan dosing, aduk dan trolley, matikan pompa distribusi.
-      blocked-on-backup-power-types: [DOSING_PUMP, STIRRER, TROLLEY_MOTOR, DISTRIBUTION_PUMP]
+      blocked-on-backup-power-types:
+        [DOSING_PUMP, STIRRER, TROLLEY_MOTOR, DISTRIBUTION_PUMP, TROLLEY_PATROL, TROLLEY_POSITION, DOSING_LOOP]
       # §5.3: dosing (pompa N/P/K + aduk) tidak bersamaan dengan trolley (anggaran arus UPS 4 A) maupun
       # pompa distribusi. Dosing dan aduk sengaja tidak satu grup - keduanya memang jalan bersamaan.
+      # Dalam satu grup, SEMUA tipe yang berbeda saling blokir - jadi DOSING_PUMP dan STIRRER tidak boleh
+      # berada di grup yang sama. Aktuator virtual (D2): TROLLEY_PATROL/TROLLEY_POSITION diperlakukan seperti
+      # TROLLEY_MOTOR, DOSING_LOOP seperti DOSING_PUMP. DOSING_LOOP sengaja tidak satu grup dengan STIRRER,
+      # karena loop itu sendiri yang menyalakan aduk.
       exclusive-type-groups:
         - [DOSING_PUMP, TROLLEY_MOTOR]
         - [STIRRER, TROLLEY_MOTOR]
         - [DOSING_PUMP, DISTRIBUTION_PUMP]
         - [STIRRER, DISTRIBUTION_PUMP]
+        # Pompa dosing manual tidak bersamaan dengan loop dosing.
+        - [DOSING_LOOP, DOSING_PUMP]
+        - [DOSING_LOOP, DISTRIBUTION_PUMP]
+        # Juga: hanya satu gerakan trolley dalam satu waktu (patroli, pindah stasiun, atau relay mentah).
+        - [DOSING_LOOP, TROLLEY_MOTOR, TROLLEY_PATROL, TROLLEY_POSITION]
+        - [DOSING_PUMP, TROLLEY_PATROL, TROLLEY_POSITION]
+        - [STIRRER, TROLLEY_PATROL, TROLLEY_POSITION]
       # §5.3.2: pan hanya saat trolley diam. Satu arah: kamera boleh tetap menghadap barat selama trolley jalan.
+      # Pan manual juga ditolak selama patroli atau pindah stasiun; urutan pan saat patroli diatur edge.
       blocked-while-active:
         - types: [CAMERA_PAN]
-          while-active: [TROLLEY_MOTOR]
+          while-active: [TROLLEY_MOTOR, TROLLEY_PATROL, TROLLEY_POSITION]
       # §6.2 + §12.4: float LOW terbuka = air rendah atau kabel putus. Bacaan yang hilang atau basi juga diblokir.
       signal-interlocks:
         - name: FLOAT_LOW
@@ -235,5 +290,28 @@ app:
           metric-key: tank.float_low_ok
           ok-values: ["1", "CLOSED", "TRUE"]
           max-age: 10m
-          blocked-types: [DISTRIBUTION_PUMP, DOSING_PUMP, STIRRER]
+          blocked-types: [DISTRIBUTION_PUMP, DOSING_PUMP, STIRRER, DOSING_LOOP]
       active-states: ["ON"]
+
+    # Perintah yang diterima tiap tipe aktuator. Selain ini ditolak 400 sebelum sampai ke edge (yang akan
+    # menjawab UNSUPPORTED). Tipe yang tidak tercantum menerima perintah apa saja. Nama parameter dan
+    # nilai teks dikirim apa adanya ke edge, jadi harus sama persis dengan config edge.
+    commands:
+      vocabularies:
+        - types: [DISTRIBUTION_PUMP, CAMERA_PAN, TROLLEY_MOTOR, TROLLEY_DIRECTION, DOSING_PUMP, STIRRER, SENSOR_POWER]
+          commands: ["ON", "OFF"]
+        - types: [TROLLEY_PATROL]
+          commands: ["START", "STOP"]
+        - types: [TROLLEY_POSITION]
+          commands: ["HOME", "GOTO_STATION", "STOP"]
+          parameters:
+            # trolley.stations di config edge; 0 = HOME, pakai perintah HOME.
+            - { command: GOTO_STATION, name: station, kind: INTEGER, min: 1, max: 10 }
+        - types: [DOSING_LOOP]
+          commands: ["DOSE_TO_TARGET", "STOP"]
+          parameters:
+            # Penolak salah ketik (mis. 22 untuk 2,2), bukan batas agronomi: EC target di template fase
+            # 1,5-2,0 mS/cm. Persempit di sini bila tim agronomi menetapkan batasnya.
+            - { command: DOSE_TO_TARGET, name: targetEc, kind: NUMBER, min: 0.5, max: 4.0 }
+            # Kunci dosing.ratio di config edge.
+            - { command: DOSE_TO_TARGET, name: phase, kind: TEXT, allowed-values: [vegetatif, buah_muda, pembesaran_buah] }

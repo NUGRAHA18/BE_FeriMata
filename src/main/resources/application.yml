@@ -136,8 +136,16 @@ app:
       interval: 6h
       initial-delay: 5m
 
+  captures:
+    # Folder foto trolley milik edge agent (camera.root, di Jetson /var/lib/fertimata/data/citra). Disajikan
+    # read-only di /captures/** dengan otentikasi yang sama seperti API. Kosong = tidak disajikan.
+    directory: ${CAPTURES_DIR:}
+    # Foto tidak pernah berubah setelah ditulis, jadi browser boleh menyimpannya sebentar.
+    cache-max-age: ${CAPTURES_CACHE_MAX_AGE:1d}
+
   metrics:
-    # TODO(hardware): interval kirim telemetri edge agent. Dasar "pesan yang diharapkan" di /api/metrics/system.
+    # Interval kirim telemetri untuk device tanpa entri device-intervals di katalog hardware.
+    # Dasar "pesan yang diharapkan" di /api/metrics/system.
     expected-telemetry-interval: ${METRICS_EXPECTED_TELEMETRY_INTERVAL:30s}
     uptime-bucket: ${METRICS_UPTIME_BUCKET:5m}
     max-range: 92d

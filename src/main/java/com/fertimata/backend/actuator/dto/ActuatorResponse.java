@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.fertimata.backend.actuator.domain.Actuator;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
+import java.util.List;
 
 /** Read model for an actuator. */
 @Schema(name = "Actuator")
@@ -20,6 +21,10 @@ public record ActuatorResponse(
         Instant stateUpdatedAt,
         @Schema(description = "Longest run one activating command may request; null means no limit")
                 Integer maxRunSeconds,
+        @Schema(
+                        description = "Command names this actuator accepts; null when its type is unrestricted",
+                        example = "[\"ON\", \"OFF\"]")
+                List<String> supportedCommands,
         String description,
         @JsonRawValue
                 @Schema(type = "object", description = "Informational hardware binding; never used for decisions")
@@ -27,7 +32,7 @@ public record ActuatorResponse(
         Instant createdAt,
         Instant updatedAt) {
 
-    public static ActuatorResponse from(Actuator actuator) {
+    public static ActuatorResponse from(Actuator actuator, List<String> supportedCommands) {
         return new ActuatorResponse(
                 actuator.getId(),
                 actuator.getDevice().getId(),
@@ -39,6 +44,7 @@ public record ActuatorResponse(
                 actuator.getCurrentState(),
                 actuator.getStateUpdatedAt(),
                 actuator.getMaxRunSeconds(),
+                supportedCommands,
                 actuator.getDescription(),
                 actuator.getMetadata(),
                 actuator.getCreatedAt(),

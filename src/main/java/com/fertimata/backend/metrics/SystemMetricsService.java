@@ -119,7 +119,6 @@ public class SystemMetricsService {
         }
 
         long windowSeconds = Duration.between(from, to).toSeconds();
-        long expected = expectedMessages(windowSeconds);
         long totalBuckets = Math.max(1, ceilDiv(windowSeconds, bucketSeconds));
 
         List<SystemMetricsResponse.DeviceMetrics> result = new ArrayList<>();
@@ -130,10 +129,13 @@ public class SystemMetricsService {
             Optional<SystemMetricsQueries.DeviceTelemetryRow> row = Optional.ofNullable(rows.get(device.getId()));
             long received = row.map(SystemMetricsQueries.DeviceTelemetryRow::messages).orElse(0L);
             long live = row.map(SystemMetricsQueries.DeviceTelemetryRow::liveBuckets).orElse(0L);
+            List<Duration> intervals = properties.intervalsFor(device.getDeviceCode());
+            long expected = expectedMessages(windowSeconds, intervals);
             result.add(new SystemMetricsResponse.DeviceMetrics(
                     device.getId(),
                     device.getDeviceCode(),
                     device.getName(),
+                    intervals.stream().map(Duration::toSeconds).toList(),
                     received,
                     expected,
                     percent(received, expected),
@@ -141,14 +143,14 @@ public class SystemMetricsService {
                     row.map(r -> seconds(r.latencyP50())).orElse(null),
                     row.map(r -> seconds(r.latencyP95())).orElse(null),
                     row.map(r -> seconds(r.latencyMax())).orElse(null),
-                    dailyCompleteness(daily.getOrDefault(device.getId(), Map.of()), from, to, zone)));
+                    dailyCompleteness(daily.getOrDefault(device.getId(), Map.of()), from, to, zone, intervals)));
         }
         return result;
     }
 
     /** Satu entri per tanggal lokal di rentang; hari di tepi rentang hanya mengharapkan bagian yang tercakup. */
     private List<SystemMetricsResponse.DailyCompleteness> dailyCompleteness(
-            Map<LocalDate, Long> counts, Instant from, Instant to, ZoneId zone) {
+            Map<LocalDate, Long> counts, Instant from, Instant to, ZoneId zone, List<Duration> intervals) {
         List<SystemMetricsResponse.DailyCompleteness> days = new ArrayList<>();
         LocalDate day = from.atZone(zone).toLocalDate();
         LocalDate last = to.atZone(zone).toLocalDate();
@@ -157,7 +159,7 @@ public class SystemMetricsService {
             Instant dayEnd = day.plusDays(1).atStartOfDay(zone).toInstant();
             Instant start = dayStart.isBefore(from) ? from : dayStart;
             Instant end = dayEnd.isAfter(to) ? to : dayEnd;
-            long expected = expectedMessages(Duration.between(start, end).toSeconds());
+            long expected = expectedMessages(Duration.between(start, end).toSeconds(), intervals);
             long received = counts.getOrDefault(day, 0L);
             days.add(new SystemMetricsResponse.DailyCompleteness(day, received, expected, percent(received, expected)));
             day = day.plusDays(1);
@@ -165,9 +167,13 @@ public class SystemMetricsService {
         return days;
     }
 
-    private long expectedMessages(long windowSeconds) {
-        long interval = Math.max(1, properties.expectedTelemetryInterval().toSeconds());
-        return windowSeconds / interval;
+    /** Satu pesan per interval untuk setiap kelompok polling device itu. */
+    private static long expectedMessages(long windowSeconds, List<Duration> intervals) {
+        long expected = 0;
+        for (Duration interval : intervals) {
+            expected += windowSeconds / Math.max(1, interval.toSeconds());
+        }
+        return expected;
     }
 
     // ── Aktuasi ───────────────────────────────────────────────────────────────

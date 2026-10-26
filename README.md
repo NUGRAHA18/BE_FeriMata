@@ -167,6 +167,22 @@ and `.env.example` documents every variable.
 | `HARDWARE_CATALOG_SYNC` | `true` | Create missing catalog rows at startup; never modifies existing rows |
 | `ACTUATOR_REFUSE_WHEN_DEVICE_OFFLINE` | `false` (`true` under `jetson`) | Refuse activating commands for a device that is not ONLINE |
 | `ACTUATOR_COMMAND_TTL` | empty (`30s` under `jetson`, `60s` under `dev`) | Adds `expiresAt` to commands; the edge agent discards late ones |
+| `CAPTURES_DIR` | empty | Edge agent's photo folder (`camera.root`), served read-only at `/captures/**` with the same authentication as the API. Empty disables it. The Jetson compose file mounts `CAPTURES_HOST_DIR` (default `/var/lib/fertimata/data/citra`) |
+| `METRICS_EXPECTED_TELEMETRY_INTERVAL` | `30s` | Completeness baseline for devices without their own entry in the catalog's `app.metrics.device-intervals` |
+
+Each actuator type has a command vocabulary in the catalog (`app.actuator.commands`): relays accept
+`ON`/`OFF`; the virtual actuators accept the high-level commands below and are run as a sequence by the
+edge agent. Anything else is refused with `400` before it is published. `GET /api/actuators` returns
+the accepted names as `supportedCommands`.
+
+| Actuator | Commands | Parameters |
+|---|---|---|
+| `TROLLEY-PATROL` (JETSON-01) | `START`, `STOP` | — |
+| `TROLLEY-GOTO` (JETSON-01) | `HOME`, `GOTO_STATION`, `STOP` | `{"station": 1..10}` for `GOTO_STATION` |
+| `DOSING-LOOP` (RIO-TANK-01) | `DOSE_TO_TARGET`, `STOP` | `{"targetEc": 0.5..4.0, "phase": "vegetatif" \| "buah_muda" \| "pembesaran_buah"}` |
+
+`STOP` and `OFF` are never held by an interlock. A virtual command is `EXECUTED` when the edge
+acknowledges that the sequence **started**; the end is the actuator's reported state returning to `OFF`.
 
 | `TELEMETRY_AUTO_REGISTER_SENSORS` | `true` | Create a disabled sensor for an unknown metric |
 | `TELEMETRY_MAX_CLOCK_SKEW_SECONDS` | `300` | Guards against an unsynced device clock |
@@ -320,6 +336,7 @@ Full documentation: **<http://localhost:8080/swagger-ui.html>**
 | `PATCH` | `/api/actuators/{id}` | Rename, enable/disable, change `maxRunSeconds` (0 removes it) |
 | `POST` | `/api/actuators/{id}/commands` | **Command an actuator** → `202` |
 | `GET` | `/api/actuators/{id}/commands` | Command history |
+| `GET` | `/captures/{date}/{file}` | Trolley photo referenced by an AI detection's `imageUrl` (authenticated; fetch with the bearer token, a plain `<img src>` cannot send it) |
 | `POST` | `/api/auth/refresh` | Exchange a refresh token for a new pair (single-use, rotated) |
 | `POST` | `/api/auth/logout` | Revoke this device's refresh token |
 | `POST` | `/api/auth/change-password` | Change own password; other sessions are revoked |
@@ -565,7 +582,7 @@ still needed, and what is in place meanwhile:
 | # | Needed from | Decision | Meanwhile |
 |---|---|---|---|
 | 1 | Hardware | Final sensor set, units, sampling rate | Rev A catalog in `hardware/fertimata-rev-a.yml`; units still to verify on arrival |
-| 2 | Hardware | Final actuator set and command names | Rev A catalog; `commandType` free text, `ON` configured as the activating command |
+| 2 | Hardware | Final actuator set and command names | Rev A catalog with per-type command vocabularies, including the virtual patrol, goto and dosing-loop actuators (D2) |
 | 3 | Hardware + agronomy | Command parameter rules (e.g. maximum run time) | Configurable interlocks (incl. float LOW and pan-while-moving) + per-actuator `maxRunSeconds`; limits are the provisional §5.4 values until calibration |
 | 4 | Hardware | MQTT topic convention | Configurable templates; no topic string in code |
 | 5 | Firmware | Heartbeat interval → the offline timeout | Configurable, provisional default 120 s |

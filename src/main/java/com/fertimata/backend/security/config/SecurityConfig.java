@@ -184,6 +184,7 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
         source.registerCorsConfiguration("/ws/**", configuration);
+        source.registerCorsConfiguration("/captures/**", configuration);
         return source;
     }
 

@@ -13,14 +13,17 @@ import static org.mockito.Mockito.when;
 import com.fertimata.backend.actuator.domain.Actuator;
 import com.fertimata.backend.actuator.domain.ActuatorRepository;
 import com.fertimata.backend.actuator.safety.ActuatorSafetyProperties;
+import com.fertimata.backend.actuator.safety.CommandVocabularyProperties;
 import com.fertimata.backend.common.util.JsonSupport;
 import com.fertimata.backend.config.PowerProperties;
 import com.fertimata.backend.device.Device;
 import com.fertimata.backend.device.DeviceRepository;
+import com.fertimata.backend.metrics.MetricsProperties;
 import com.fertimata.backend.sensor.Sensor;
 import com.fertimata.backend.sensor.SensorRepository;
 import com.fertimata.backend.support.TestFixtures;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -64,10 +67,11 @@ class HardwareCatalogTest {
                 .containsExactly("JETSON-01", "PZEM-01", "PANEL-01", "GREENHOUSE-01", "RIO-TANK-01");
         long sensors = catalog.devices().stream().mapToLong(d -> d.sensors().size()).sum();
         long actuators = catalog.devices().stream().mapToLong(d -> d.actuators().size()).sum();
-        // One soil sensor (7 values), SHT40 (2), light, and EC, pH, water temperature and float LOW at the tank.
-        assertThat(sensors).isEqualTo(4 + 6 + 10 + 4);
-        // Relay 20 R0-R3, relay 21 R0-R2, R4 and R5.
-        assertThat(actuators).isEqualTo(9);
+        // One soil sensor (7 values), SHT40 (2), light, and EC, pH, water temperature and float LOW at the tank,
+        // plus the six dosing.* values the edge reports per dosing iteration (BE-4).
+        assertThat(sensors).isEqualTo(4 + 6 + 10 + 4 + 6);
+        // Relay 20 R0-R3, relay 21 R0-R2, R4 and R5, plus the virtual patrol, goto and dosing loop (BE-1).
+        assertThat(actuators).isEqualTo(9 + 3);
 
         HardwareCatalogProperties.ActuatorEntry dosingN = catalog.devices().get(4).actuators().get(0);
         assertThat(dosingN.metadata()).containsEntry("modbusAddress", "21").containsEntry("channel", "R0");
@@ -124,21 +128,34 @@ class HardwareCatalogTest {
 
         // Guards against YAML 1.1 reading an unquoted ON as the boolean true, which silently turned
         // every interlock off during end-to-end verification.
-        assertThat(safety.activatingCommands()).containsExactly("ON");
+        assertThat(safety.activatingCommands()).containsExactly("ON", "START", "HOME", "GOTO_STATION", "DOSE_TO_TARGET");
         assertThat(safety.activeStates()).containsExactly("ON");
         assertThat(safety.isActivating("on")).isTrue();
+        // A stop is never an activating command, so no interlock can ever hold it back.
+        assertThat(safety.isActivating("STOP")).isFalse();
+        assertThat(safety.isActivating("OFF")).isFalse();
         assertThat(safety.timedTypes())
                 .containsExactly("DISTRIBUTION_PUMP", "TROLLEY_MOTOR", "DOSING_PUMP", "STIRRER");
-        assertThat(safety.blockedOnBackupPowerTypes())
-                .containsExactly("DOSING_PUMP", "STIRRER", "TROLLEY_MOTOR", "DISTRIBUTION_PUMP");
+        assertThat(safety.blockedOnBackupPowerTypes()).containsExactly(
+                "DOSING_PUMP", "STIRRER", "TROLLEY_MOTOR", "DISTRIBUTION_PUMP", "TROLLEY_PATROL", "TROLLEY_POSITION",
+                "DOSING_LOOP");
         assertThat(safety.exclusiveTypeGroups()).containsExactly(
                 List.of("DOSING_PUMP", "TROLLEY_MOTOR"),
                 List.of("STIRRER", "TROLLEY_MOTOR"),
                 List.of("DOSING_PUMP", "DISTRIBUTION_PUMP"),
-                List.of("STIRRER", "DISTRIBUTION_PUMP"));
+                List.of("STIRRER", "DISTRIBUTION_PUMP"),
+                List.of("DOSING_LOOP", "DOSING_PUMP"),
+                List.of("DOSING_LOOP", "DISTRIBUTION_PUMP"),
+                List.of("DOSING_LOOP", "TROLLEY_MOTOR", "TROLLEY_PATROL", "TROLLEY_POSITION"),
+                List.of("DOSING_PUMP", "TROLLEY_PATROL", "TROLLEY_POSITION"),
+                List.of("STIRRER", "TROLLEY_PATROL", "TROLLEY_POSITION"));
+        // Dosing and stirring run together by design, so no group may hold both.
+        assertThat(safety.exclusiveTypeGroups())
+                .noneMatch(group -> group.contains("DOSING_PUMP") && group.contains("STIRRER"))
+                .noneMatch(group -> group.contains("DOSING_LOOP") && group.contains("STIRRER"));
         assertThat(safety.blockedWhileActive()).singleElement().satisfies(rule -> {
             assertThat(rule.types()).containsExactly("CAMERA_PAN");
-            assertThat(rule.whileActive()).containsExactly("TROLLEY_MOTOR");
+            assertThat(rule.whileActive()).containsExactly("TROLLEY_MOTOR", "TROLLEY_PATROL", "TROLLEY_POSITION");
         });
         assertThat(safety.signalInterlocks()).singleElement().satisfies(signal -> {
             assertThat(signal.name()).isEqualTo("FLOAT_LOW");
@@ -146,10 +163,65 @@ class HardwareCatalogTest {
             assertThat(signal.metricKey()).isEqualTo("tank.float_low_ok");
             assertThat(signal.okValues()).contains("1");
             assertThat(signal.maxAge()).isEqualTo(java.time.Duration.ofMinutes(10));
-            assertThat(signal.blockedTypes()).containsExactly("DISTRIBUTION_PUMP", "DOSING_PUMP", "STIRRER");
+            assertThat(signal.blockedTypes())
+                    .containsExactly("DISTRIBUTION_PUMP", "DOSING_PUMP", "STIRRER", "DOSING_LOOP");
         });
         assertThat(power.isNormal("mains")).isTrue();
         assertThat(power.isNormal("UNKNOWN")).isFalse();
+    }
+
+    @Test
+    @DisplayName("every catalog actuator has a command vocabulary, and every activating command belongs to one")
+    void bindsCommandVocabulary() {
+        HardwareCatalogProperties catalog =
+                binder.bind("app.catalog", HardwareCatalogProperties.class).get();
+        ActuatorSafetyProperties safety =
+                binder.bind("app.actuator.safety", ActuatorSafetyProperties.class).get();
+        CommandVocabularyProperties vocabulary =
+                binder.bind("app.actuator.commands", CommandVocabularyProperties.class).get();
+
+        catalog.devices().stream()
+                .flatMap(device -> device.actuators().stream())
+                .forEach(actuator -> assertThat(vocabulary.forType(actuator.type())).as(actuator.code()).isPresent());
+        // An activating command no vocabulary accepts would be dead configuration, or a typo in one list.
+        safety.activatingCommands().forEach(command -> assertThat(vocabulary.vocabularies())
+                .as(command)
+                .anyMatch(entry -> entry.accepts(command)));
+
+        assertThat(vocabulary.commandsFor("TROLLEY_PATROL")).containsExactly("START", "STOP");
+        assertThat(vocabulary.commandsFor("DISTRIBUTION_PUMP")).containsExactly("ON", "OFF");
+        CommandVocabularyProperties.Vocabulary loop = vocabulary.forType("DOSING_LOOP").orElseThrow();
+        assertThat(loop.rulesFor("DOSE_TO_TARGET")).satisfiesExactly(
+                ec -> {
+                    assertThat(ec.name()).isEqualTo("targetEc");
+                    assertThat(ec.kind()).isEqualTo(CommandVocabularyProperties.Kind.NUMBER);
+                    assertThat(ec.required()).isTrue();
+                },
+                phase -> assertThat(phase.allowedValues()).containsExactly("vegetatif", "buah_muda", "pembesaran_buah"));
+        assertThat(vocabulary.forType("TROLLEY_POSITION").orElseThrow().rulesFor("GOTO_STATION"))
+                .singleElement()
+                .satisfies(station -> {
+                    assertThat(station.kind()).isEqualTo(CommandVocabularyProperties.Kind.INTEGER);
+                    assertThat(station.min()).isEqualByComparingTo("1");
+                    assertThat(station.max()).isEqualByComparingTo("10");
+                });
+    }
+
+    @Test
+    @DisplayName("per-device telemetry intervals bind and only name catalog devices")
+    void bindsTelemetryIntervals() {
+        HardwareCatalogProperties catalog =
+                binder.bind("app.catalog", HardwareCatalogProperties.class).get();
+        MetricsProperties metrics = binder.bind("app.metrics", MetricsProperties.class).get();
+
+        assertThat(metrics.intervalsFor("PZEM-01")).containsExactly(Duration.ofSeconds(3));
+        assertThat(metrics.intervalsFor("GREENHOUSE-01")).containsExactly(Duration.ofSeconds(60), Duration.ofMinutes(5));
+        assertThat(metrics.intervalsFor("RIO-TANK-01"))
+                .containsExactly(Duration.ofSeconds(5), Duration.ofMinutes(10));
+        metrics.deviceIntervals().forEach(entry -> assertThat(catalog.devices())
+                .extracting(HardwareCatalogProperties.DeviceEntry::code)
+                .as(entry.device())
+                .contains(entry.device()));
     }
 
     @Test

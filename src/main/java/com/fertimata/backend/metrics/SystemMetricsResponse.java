@@ -12,7 +12,8 @@ import java.util.List;
 public record SystemMetricsResponse(
         Instant from,
         Instant to,
-        @Schema(description = "Expected telemetry interval used for completeness, seconds") long expectedIntervalSeconds,
+        @Schema(description = "Default expected telemetry interval, seconds, for devices without their own")
+                long expectedIntervalSeconds,
         @Schema(description = "Uptime slot width, seconds") long uptimeBucketSeconds,
         List<DeviceMetrics> devices,
         ActuationMetrics actuation,
@@ -26,6 +27,8 @@ public record SystemMetricsResponse(
             Long deviceId,
             String deviceCode,
             String deviceName,
+            @Schema(description = "One interval per polling group of this device, seconds; expected messages are their sum")
+                    List<Long> expectedIntervalsSeconds,
             @Schema(description = "Distinct telemetry messages received") long messagesReceived,
             long messagesExpected,
             @Schema(description = "received / expected x 100; can exceed 100 when the device sends faster than expected")

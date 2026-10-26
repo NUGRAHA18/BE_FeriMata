@@ -284,6 +284,122 @@ class CommandGuardsTest {
     }
 
     @Nested
+    class Vocabulary {
+
+        /** Mirrors the virtual actuators of hardware/fertimata-rev-a.yml (BE-1). */
+        private static final CommandVocabularyProperties VOCABULARY = new CommandVocabularyProperties(List.of(
+                new CommandVocabularyProperties.Vocabulary(List.of("DOSING_PUMP"), List.of("ON", "OFF"), null),
+                new CommandVocabularyProperties.Vocabulary(
+                        List.of("TROLLEY_POSITION"), List.of("HOME", "GOTO_STATION", "STOP"), List.of(
+                                new CommandVocabularyProperties.ParameterRule("GOTO_STATION", "station",
+                                        CommandVocabularyProperties.Kind.INTEGER, null, BigDecimal.ONE,
+                                        BigDecimal.TEN, null))),
+                new CommandVocabularyProperties.Vocabulary(
+                        List.of("DOSING_LOOP"), List.of("DOSE_TO_TARGET", "STOP"), List.of(
+                                new CommandVocabularyProperties.ParameterRule("DOSE_TO_TARGET", "targetEc",
+                                        CommandVocabularyProperties.Kind.NUMBER, null, new BigDecimal("0.5"),
+                                        new BigDecimal("4.0"), null),
+                                new CommandVocabularyProperties.ParameterRule("dose_to_target", "phase",
+                                        CommandVocabularyProperties.Kind.TEXT, null, null, null,
+                                        List.of("vegetatif", "buah_muda"))))));
+
+        private final CommandVocabularyGuard guard = new CommandVocabularyGuard(VOCABULARY);
+        private final Actuator goTo = actuator(50L, panel, "TROLLEY-GOTO", "TROLLEY_POSITION");
+        private final Actuator loop = actuator(60L, tank, "DOSING-LOOP", "DOSING_LOOP");
+
+        private static CommandContext command(Actuator actuator, String name, Map<String, Object> parameters) {
+            return new CommandContext(actuator, name, parameters, false);
+        }
+
+        @Test
+        @DisplayName("a command outside the type's vocabulary is refused, case-insensitively matched otherwise")
+        void unknownCommandRefused() {
+            assertThatThrownBy(() -> guard.check(command(goTo, "START", Map.of())))
+                    .isInstanceOf(InvalidCommandException.class)
+                    .hasMessageContaining("HOME, GOTO_STATION, STOP");
+            assertThatCode(() -> guard.check(command(goTo, "home", Map.of()))).doesNotThrowAnyException();
+            assertThatCode(() -> guard.check(command(loop, "STOP", Map.of()))).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("an unrestricted type accepts any command, as before the vocabulary existed")
+        void unlistedTypeIsOpen() {
+            Actuator custom = actuator(70L, panel, "LED", "ILLUMINATION");
+
+            assertThatCode(() -> guard.check(command(custom, "BLINK", Map.of()))).doesNotThrowAnyException();
+            assertThat(VOCABULARY.commandsFor("ILLUMINATION")).isNull();
+        }
+
+        @Test
+        @DisplayName("GOTO_STATION needs a whole station number within the rail")
+        void stationParameter() {
+            assertThatCode(() -> guard.check(command(goTo, "GOTO_STATION", Map.of("station", 3))))
+                    .doesNotThrowAnyException();
+            assertThatThrownBy(() -> guard.check(command(goTo, "GOTO_STATION", Map.of())))
+                    .isInstanceOf(InvalidCommandException.class)
+                    .hasMessageContaining("requires parameter station");
+            assertThatThrownBy(() -> guard.check(command(goTo, "GOTO_STATION", Map.of("station", 11))))
+                    .isInstanceOf(InvalidCommandException.class)
+                    .hasMessageContaining("outside 1..10");
+            assertThatThrownBy(() -> guard.check(command(goTo, "GOTO_STATION", Map.of("station", 2.5))))
+                    .isInstanceOf(InvalidCommandException.class)
+                    .hasMessageContaining("whole number");
+            // A string is refused even when it looks like a number: the edge reads the JSON type.
+            assertThatThrownBy(() -> guard.check(command(goTo, "GOTO_STATION", Map.of("station", "3"))))
+                    .isInstanceOf(InvalidCommandException.class);
+        }
+
+        @Test
+        @DisplayName("DOSE_TO_TARGET needs a plausible EC target and a phase the edge knows, spelled exactly")
+        void doseParameters() {
+            assertThatCode(() -> guard.check(command(loop, "DOSE_TO_TARGET",
+                    Map.of("targetEc", 2.2, "phase", "vegetatif")))).doesNotThrowAnyException();
+            assertThatThrownBy(() -> guard.check(command(loop, "DOSE_TO_TARGET",
+                    Map.of("targetEc", 22, "phase", "vegetatif"))))
+                    .isInstanceOf(InvalidCommandException.class)
+                    .hasMessageContaining("targetEc");
+            assertThatThrownBy(() -> guard.check(command(loop, "DOSE_TO_TARGET",
+                    Map.of("targetEc", 2.2, "phase", "Vegetatif"))))
+                    .isInstanceOf(InvalidCommandException.class)
+                    .hasMessageContaining("vegetatif, buah_muda");
+            assertThatThrownBy(() -> guard.check(command(loop, "DOSE_TO_TARGET", Map.of("targetEc", 2.2))))
+                    .isInstanceOf(InvalidCommandException.class)
+                    .hasMessageContaining("requires parameter phase");
+            // Rules belong to one command: STOP carries no parameters at all.
+            assertThatCode(() -> guard.check(command(loop, "STOP", Map.of()))).doesNotThrowAnyException();
+        }
+
+        @Test
+        @DisplayName("STOP of a virtual actuator is never held by an interlock, START is")
+        void virtualStopNeverBlocked() {
+            ActuatorSafetyProperties virtual = new ActuatorSafetyProperties(
+                    List.of("ON", "START", "HOME", "GOTO_STATION", "DOSE_TO_TARGET"), null, null,
+                    List.of("TROLLEY_PATROL"), List.of(List.of("DOSING_PUMP", "TROLLEY_PATROL")), null, false, null,
+                    null, null);
+            DeviceService deviceService = mock(DeviceService.class);
+            Device jetson = TestFixtures.onlineDevice(9L, "JETSON-01");
+            jetson.reportPowerSource("BATTERY", Instant.now());
+            when(deviceService.devicesOnBackupPower()).thenReturn(List.of(jetson));
+            ActuatorRepository repository = mock(ActuatorRepository.class);
+            Actuator patrol = actuator(80L, jetson, "TROLLEY-PATROL", "TROLLEY_PATROL");
+            Actuator pump = actuator(10L, tank, "DOSING-N", "DOSING_PUMP");
+            pump.reportState("ON", Instant.now());
+            when(repository.findAllWithDevice()).thenReturn(List.of(patrol, pump));
+            CommandSafetyPolicy policy = new CommandSafetyPolicy(virtual, List.of(
+                    new BackupPowerGuard(virtual, deviceService), new ExclusiveOperationGuard(virtual, repository)));
+
+            assertThatThrownBy(() -> policy.check(patrol, "START", Map.of()))
+                    .isInstanceOf(SafetyInterlockException.class);
+            assertThatCode(() -> policy.check(patrol, "STOP", Map.of())).doesNotThrowAnyException();
+
+            when(deviceService.devicesOnBackupPower()).thenReturn(List.of());
+            assertThatThrownBy(() -> policy.check(patrol, "START", Map.of()))
+                    .isInstanceOf(SafetyInterlockException.class)
+                    .hasMessageContaining("DOSING-N");
+        }
+    }
+
+    @Nested
     class DeviceOnline {
 
         private final DeviceOnlineGuard guard = new DeviceOnlineGuard(REV_A);

@@ -78,7 +78,11 @@ class SystemMetricsServiceTest {
                 sensorReadingRepository,
                 pumpCalibrationService,
                 cultivationService,
-                new MetricsProperties(Duration.ofSeconds(60), Duration.ofMinutes(5), null, null),
+                new MetricsProperties(Duration.ofSeconds(60), Duration.ofMinutes(5), null, null, List.of(
+                        new MetricsProperties.DeviceIntervals(
+                                "PZEM-01", List.of(Duration.ofSeconds(3))),
+                        new MetricsProperties.DeviceIntervals(
+                                "RIO-TANK-01", List.of(Duration.ofSeconds(5), Duration.ofMinutes(10))))),
                 Clock.fixed(TO, ZoneOffset.UTC));
         greenhouse = TestFixtures.device(1L, "GREENHOUSE-01");
         when(cultivationService.zone()).thenReturn(WIB);
@@ -118,6 +122,30 @@ class SystemMetricsServiceTest {
         assertThat(device.daily().get(1).completenessPercent()).isEqualByComparingTo("80.00");
         assertThat(metrics.waterVolumeL()).isNull();
         assertThat(metrics.notes()).anyMatch(n -> n.contains("flow meter"));
+    }
+
+    @Test
+    @DisplayName("a device with several polling groups expects one message per interval of each group")
+    void perDeviceIntervals() {
+        Device tank = TestFixtures.device(3L, "RIO-TANK-01");
+        when(deviceRepository.findAllByOrderByDeviceCodeAsc()).thenReturn(List.of(greenhouse, tank));
+        when(sensorRepository.findAllWithDevice()).thenReturn(List.of(
+                TestFixtures.sensor(10L, greenhouse, "AIR-TEMP", "air.temperature", "C"),
+                TestFixtures.sensor(20L, tank, "FLOAT-LOW", "tank.float_low_ok", null)));
+        when(queries.telemetryPerDevice(any(), any(), anyLong())).thenReturn(List.of());
+        when(queries.messagesPerDay(any(), any(), any())).thenReturn(List.of());
+        when(queries.commandsPerActuator(any(), any())).thenReturn(List.of());
+
+        List<SystemMetricsResponse.DeviceMetrics> devices = service.metrics(FROM, TO).devices();
+
+        // GREENHOUSE-01 has no entry and falls back to the global 60 s: 86 400 / 60.
+        assertThat(devices.get(0).expectedIntervalsSeconds()).containsExactly(60L);
+        assertThat(devices.get(0).messagesExpected()).isEqualTo(1440);
+        // Float every 5 s plus EC/pH every 10 minutes: 17 280 + 144.
+        assertThat(devices.get(1).expectedIntervalsSeconds()).containsExactly(5L, 600L);
+        assertThat(devices.get(1).messagesExpected()).isEqualTo(17_280 + 144);
+        assertThat(devices.get(1).daily()).extracting(SystemMetricsResponse.DailyCompleteness::messagesExpected)
+                .containsExactly(8712L, 8712L);
     }
 
     @Test

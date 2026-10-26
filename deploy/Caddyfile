@@ -1,4 +1,5 @@
-# One origin for the dashboard: the frontend at /, the backend at /api, /ws and the health check.
+# One origin for the dashboard: the frontend at /, the backend at /api, /ws, /captures (trolley photos)
+# and the health check.
 #
 # Plain HTTP on :80 on purpose. Cloudflare terminates TLS for the tunnel hostname, and LAN clients
 # use http://<jetson-ip>, so Caddy never needs a certificate.
@@ -14,7 +15,7 @@
 :80 {
 	encode gzip
 
-	@backend path /api/* /ws /ws/* /actuator/health /actuator/health/*
+	@backend path /api/* /ws /ws/* /captures/* /actuator/health /actuator/health/*
 	handle @backend {
 		# WebSocket upgrades are proxied automatically.
 		reverse_proxy backend:8080
