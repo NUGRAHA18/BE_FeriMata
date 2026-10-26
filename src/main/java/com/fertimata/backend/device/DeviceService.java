@@ -223,10 +223,21 @@ public class DeviceService {
                 .toList();
     }
 
-    /** Flips a device to OFFLINE and raises one alert per outage. */
+    /**
+     * Flips a device to OFFLINE and raises one alert per outage.
+     *
+     * <p>The liveness monitor passes a copy loaded by {@link #findStaleDevices}, whose transaction has
+     * already ended, so changing that copy would never reach the database. The row is reloaded here and
+     * checked again, because the device may have reported in since it was found stale.
+     */
     @Transactional
-    public void markOffline(Device device) {
-        if (device.getStatus() == DeviceStatus.OFFLINE) {
+    public void markOffline(Device stale) {
+        Device device = deviceRepository.findById(stale.getId()).orElse(null);
+        if (device == null || device.getStatus() == DeviceStatus.OFFLINE) {
+            return;
+        }
+        Instant cutoff = Instant.now().minus(deviceProperties.offlineTimeout());
+        if (device.getLastSeenAt() != null && !device.getLastSeenAt().isBefore(cutoff)) {
             return;
         }
         device.setStatus(DeviceStatus.OFFLINE);

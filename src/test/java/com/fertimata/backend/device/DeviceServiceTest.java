@@ -129,16 +129,36 @@ class DeviceServiceTest {
     @Test
     @DisplayName("marking a device offline publishes a status change and raises one alert")
     void markOffline() {
-        Device device = TestFixtures.onlineDevice(1L, "JETSON-001");
-        device.markSeen(Instant.now().minusSeconds(600));
+        Device detached = TestFixtures.onlineDevice(1L, "JETSON-001");
+        detached.markSeen(Instant.now().minusSeconds(600));
+        Device managed = TestFixtures.onlineDevice(1L, "JETSON-001");
+        managed.markSeen(Instant.now().minusSeconds(600));
+        when(deviceRepository.findById(1L)).thenReturn(Optional.of(managed));
 
-        deviceService.markOffline(device);
+        deviceService.markOffline(detached);
 
-        assertThat(device.getStatus()).isEqualTo(DeviceStatus.OFFLINE);
+        // The status change must land on the row loaded in this transaction, not on the stale copy.
+        assertThat(managed.getStatus()).isEqualTo(DeviceStatus.OFFLINE);
         verify(realtimeEventPublisher).publish(eqType(RealtimeEventType.DEVICE_STATUS_CHANGED), any());
         ArgumentCaptor<NewAlert> captor = ArgumentCaptor.forClass(NewAlert.class);
         verify(alertService).raiseOnceForDevice(captor.capture());
         assertThat(captor.getValue().type()).isEqualTo(AlertType.DEVICE_OFFLINE);
+    }
+
+    @Test
+    @DisplayName("a device that reported in after being found stale is not marked offline")
+    void markOfflineSkipsDeviceThatReportedSince() {
+        Device detached = TestFixtures.onlineDevice(1L, "JETSON-01");
+        detached.markSeen(Instant.now().minusSeconds(600));
+        Device managed = TestFixtures.onlineDevice(1L, "JETSON-01");
+        managed.markSeen(Instant.now());
+        when(deviceRepository.findById(1L)).thenReturn(Optional.of(managed));
+
+        deviceService.markOffline(detached);
+
+        assertThat(managed.getStatus()).isEqualTo(DeviceStatus.ONLINE);
+        verify(realtimeEventPublisher, never()).publish(any(), any());
+        verify(alertService, never()).raiseOnceForDevice(any());
     }
 
     @Test
