@@ -90,6 +90,10 @@ public class ActuatorCommand extends AuditedEntity {
     @Column(name = "error_message", length = 512)
     private String errorMessage;
 
+    /** Reason code a device put in front of its failure message; null when it gave none. */
+    @Column(name = "failure_code", length = DeviceFailureReason.MAX_CODE_LENGTH)
+    private String failureCode;
+
     public void markSent(Instant at) {
         this.status = CommandStatus.SENT;
         this.sentAt = at;
@@ -104,6 +108,13 @@ public class ActuatorCommand extends AuditedEntity {
         this.status = CommandStatus.FAILED;
         this.errorMessage = truncate(reason);
         this.executedAt = at;
+    }
+
+    /** Records a failure the device reported, keeping its message whole and its code separately. */
+    public void markFailedByDevice(String errorMessage, Instant at) {
+        DeviceFailureReason reason = DeviceFailureReason.parse(errorMessage);
+        markFailed(errorMessage == null || errorMessage.isBlank() ? reason.text() : errorMessage.strip(), at);
+        this.failureCode = reason.code();
     }
 
     private static String truncate(String value) {

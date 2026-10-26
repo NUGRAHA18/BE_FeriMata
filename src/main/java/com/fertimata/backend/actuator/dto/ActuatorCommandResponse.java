@@ -25,7 +25,12 @@ public record ActuatorCommandResponse(
         Instant requestedAt,
         Instant sentAt,
         Instant executedAt,
-        String errorMessage) {
+        String errorMessage,
+        @Schema(
+                        description = "Reason code from a failed device acknowledgement, e.g. INTERLOCK_POWER; "
+                                + "null when the failure carried no code",
+                        example = "INTERLOCK_FLOAT")
+                String failureCode) {
 
     public static ActuatorCommandResponse from(ActuatorCommand command, Map<String, Object> parameters) {
         return new ActuatorCommandResponse(
@@ -43,6 +48,7 @@ public record ActuatorCommandResponse(
                 command.getRequestedAt(),
                 command.getSentAt(),
                 command.getExecutedAt(),
-                command.getErrorMessage());
+                command.getErrorMessage(),
+                command.getFailureCode());
     }
 }

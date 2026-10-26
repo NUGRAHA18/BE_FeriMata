@@ -68,6 +68,11 @@ services:
       MQTT_USERNAME: ${MQTT_USERNAME:-}
       MQTT_PASSWORD: ${MQTT_PASSWORD:-}
 
+      # Profile dev only. Set DEV_SIMULATOR_ENABLED=false when a real edge agent publishes to the
+      # broker, otherwise simulated readings mix with the edge's.
+      DEV_SIMULATOR_ENABLED: ${DEV_SIMULATOR_ENABLED:-true}
+      DEV_SIMULATOR_INTERVAL: ${DEV_SIMULATOR_INTERVAL:-30s}
+
       BOOTSTRAP_OPERATOR_USERNAME: ${BOOTSTRAP_OPERATOR_USERNAME:-operator}
       BOOTSTRAP_OPERATOR_PASSWORD: ${BOOTSTRAP_OPERATOR_PASSWORD:-change-me}
 

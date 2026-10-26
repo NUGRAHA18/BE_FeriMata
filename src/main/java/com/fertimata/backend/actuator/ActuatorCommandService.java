@@ -6,6 +6,7 @@ import com.fertimata.backend.actuator.domain.ActuatorCommandRepository;
 import com.fertimata.backend.actuator.domain.ActuatorCommandTransport;
 import com.fertimata.backend.actuator.domain.CommandSource;
 import com.fertimata.backend.actuator.domain.CommandStatus;
+import com.fertimata.backend.actuator.domain.DeviceFailureReason;
 import com.fertimata.backend.actuator.domain.OutboundCommand;
 import com.fertimata.backend.actuator.dto.ActuatorCommandRequest;
 import com.fertimata.backend.actuator.dto.ActuatorCommandResponse;
@@ -25,6 +26,7 @@ import com.fertimata.backend.mqtt.payload.CommandAckPayload;
 import com.fertimata.backend.websocket.RealtimeEventPublisher;
 import com.fertimata.backend.websocket.RealtimeEventType;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
@@ -197,17 +199,27 @@ public class ActuatorCommandService {
             command.markExecuted(at);
             log.info("Command {} executed on device {}", ack.commandUid(), deviceCode);
         } else {
-            String reason = ack.errorMessage() == null ? "Device reported failure" : ack.errorMessage();
-            command.markFailed(reason, at);
-            log.warn("Command {} failed on device {}: {}", ack.commandUid(), deviceCode, reason);
+            command.markFailedByDevice(ack.errorMessage(), at);
+            DeviceFailureReason reason = DeviceFailureReason.parse(ack.errorMessage());
+            log.warn(
+                    "Command {} failed on device {} [{}]: {}",
+                    ack.commandUid(),
+                    deviceCode,
+                    reason.code(),
+                    reason.text());
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            metadata.put("commandUid", ack.commandUid());
+            if (reason.code() != null) {
+                metadata.put("failureCode", reason.code());
+            }
             alertService.raise(NewAlert.builder(AlertType.ACTUATOR_COMMAND_FAILED, AlertSeverity.WARNING)
                     .title("Actuator command failed on the device")
                     .message("Device %s reported that command %s failed: %s"
-                            .formatted(deviceCode, command.getCommandType(), reason))
+                            .formatted(deviceCode, command.getCommandType(), reason.text()))
                     .source(AlertSource.DEVICE)
                     .actuator(command.getActuator())
                     .device(command.getDevice())
-                    .metadata(Map.of("commandUid", ack.commandUid()))
+                    .metadata(metadata)
                     .build());
         }
 

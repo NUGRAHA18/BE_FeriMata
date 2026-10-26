@@ -215,6 +215,25 @@ class ActuatorCommandServiceTest {
     }
 
     @Test
+    @DisplayName("a coded device failure keeps the whole message and stores the code separately")
+    void codedFailureStoresReasonCode() {
+        ActuatorCommand command = pendingCommand(CommandStatus.SENT);
+        when(commandRepository.findByCommandUid("cmd-5")).thenReturn(Optional.of(command));
+
+        commandService.applyAcknowledgement(
+                "PANEL-01",
+                new CommandAckPayload("cmd-5", false, "OFF", Instant.now(), "INTERLOCK_POWER: listrik PLN padam"));
+
+        assertThat(command.getStatus()).isEqualTo(CommandStatus.FAILED);
+        assertThat(command.getErrorMessage()).isEqualTo("INTERLOCK_POWER: listrik PLN padam");
+        assertThat(command.getFailureCode()).isEqualTo("INTERLOCK_POWER");
+        ArgumentCaptor<NewAlert> captor = ArgumentCaptor.forClass(NewAlert.class);
+        verify(alertService).raise(captor.capture());
+        assertThat(captor.getValue().message()).endsWith(": listrik PLN padam");
+        assertThat(captor.getValue().metadata()).containsEntry("failureCode", "INTERLOCK_POWER");
+    }
+
+    @Test
     @DisplayName("an acknowledgement for an unknown command id is ignored, not guessed at")
     void unknownAcknowledgementIsIgnored() {
         when(commandRepository.findByCommandUid("nope")).thenReturn(Optional.empty());
@@ -257,6 +276,7 @@ class ActuatorCommandServiceTest {
                 "operator",
                 status,
                 Instant.now(),
+                null,
                 null,
                 null,
                 null);
