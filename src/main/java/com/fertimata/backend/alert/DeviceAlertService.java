@@ -54,7 +54,8 @@ public class DeviceAlertService {
      *
      * <p>While an alert of the same type is still unacknowledged for the device, a repeat is dropped:
      * an SSR that stays shorted must not produce an alert every polling cycle. Once an operator
-     * acknowledges it, the next report raises it again.
+     * acknowledges it, the next report raises it again. INFO alerts are events, not conditions, and
+     * are always recorded.
      *
      * @param deviceCode taken from the topic, not the payload
      */
@@ -96,7 +97,14 @@ public class DeviceAlertService {
         findSensor(device, payload.sensorCode()).ifPresent(alert::sensor);
         findActuator(device, payload.actuatorCode()).ifPresent(alert::actuator);
 
-        alertService.raiseOnceForDevice(alert.build());
+        NewAlert built = alert.build();
+        if (built.severity() == AlertSeverity.INFO) {
+            // An INFO alert reports an event that finished ("Patroli selesai, 20 foto"), not a condition
+            // that persists, so tonight's result must not be swallowed by last night's unread one.
+            alertService.raise(built);
+        } else {
+            alertService.raiseOnceForDevice(built);
+        }
     }
 
     private Optional<Sensor> findSensor(Device device, String code) {

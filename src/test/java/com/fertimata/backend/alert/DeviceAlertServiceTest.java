@@ -87,6 +87,19 @@ class DeviceAlertServiceTest {
     }
 
     @Test
+    @DisplayName("an INFO alert reports a finished event and is recorded even if an earlier one is unread")
+    void infoIsNeverDeduplicated() {
+        when(deviceService.resolveForIngest("JETSON-01"))
+                .thenReturn(Optional.of(TestFixtures.onlineDevice(9L, "JETSON-01")));
+
+        service.record("JETSON-01", new DeviceAlertPayload(
+                "PATROL_DONE", "INFO", "Patroli selesai", "20 foto tersimpan", null, null, null, null));
+
+        verify(alertService).raise(any(NewAlert.class));
+        verify(alertService, never()).raiseOnceForDevice(any());
+    }
+
+    @Test
     @DisplayName("an alert from an unknown device is not stored")
     void unknownDeviceIgnored() {
         when(deviceService.resolveForIngest(anyString())).thenReturn(Optional.empty());
