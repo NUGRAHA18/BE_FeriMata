@@ -286,7 +286,10 @@ class CommandGuardsTest {
     @Nested
     class Vocabulary {
 
-        /** Mirrors the virtual actuators of hardware/fertimata-rev-a.yml (BE-1). */
+        /**
+         * Mirrors the virtual actuators of hardware/fertimata-rev-a.yml (BE-1). DOSING_LOOP left the catalog (V9)
+         * but stays here to cover the NUMBER and TEXT parameter kinds.
+         */
         private static final CommandVocabularyProperties VOCABULARY = new CommandVocabularyProperties(List.of(
                 new CommandVocabularyProperties.Vocabulary(List.of("DOSING_PUMP"), List.of("ON", "OFF"), null),
                 new CommandVocabularyProperties.Vocabulary(
@@ -373,7 +376,7 @@ class CommandGuardsTest {
         @DisplayName("STOP of a virtual actuator is never held by an interlock, START is")
         void virtualStopNeverBlocked() {
             ActuatorSafetyProperties virtual = new ActuatorSafetyProperties(
-                    List.of("ON", "START", "HOME", "GOTO_STATION", "DOSE_TO_TARGET"), null, null,
+                    List.of("ON", "START", "HOME", "GOTO_STATION"), null, null,
                     List.of("TROLLEY_PATROL"), List.of(List.of("DOSING_PUMP", "TROLLEY_PATROL")), null, false, null,
                     null, null);
             DeviceService deviceService = mock(DeviceService.class);

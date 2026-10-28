@@ -179,10 +179,23 @@ the accepted names as `supportedCommands`.
 |---|---|---|
 | `TROLLEY-PATROL` (JETSON-01) | `START`, `STOP` | — |
 | `TROLLEY-GOTO` (JETSON-01) | `HOME`, `GOTO_STATION`, `STOP` | `{"station": 1..10}` for `GOTO_STATION` |
-| `DOSING-LOOP` (RIO-TANK-01) | `DOSE_TO_TARGET`, `STOP` | `{"targetEc": 0.5..4.0, "phase": "vegetatif" \| "buah_muda" \| "pembesaran_buah"}` |
 
 `STOP` and `OFF` are never held by an interlock. A virtual command is `EXECUTED` when the edge
 acknowledges that the sequence **started**; the end is the actuator's reported state returning to `OFF`.
+
+Automatic fertilizer mixing and irrigation/dosing schedules are **not** part of this backend or the
+edge agent: they belong to the AI team's separate service. That service logs in like any operator
+(an `OPERATOR` account) and drives the pumps through the same API, e.g.
+`POST /api/actuators/{id}/commands` with `{"command": "ON", "parameters": {"durationSeconds": 12}}`
+for `DOSING-N`/`-P`/`-K`, `STIRRER` and `DIST-PUMP`, so every interlock and run-time limit still applies.
+It reads the solution EC/pH and float state from `/api/sensors/{id}/latest`. The earlier `DOSING-LOOP` actuator and
+its `dosing.*` metrics are disabled by migration V9.
+
+**Safety rule S9 is the AI service's responsibility.** Neither the backend nor the edge agent refuses a
+fertilizer pump command because of the solution readings: only the float LOW, power and exclusivity
+interlocks apply. The service must not run `DOSING-N`/`-P`/`-K` when `tank.ec` or `tank.ph` is missing,
+stale (older than one tank polling interval, 600 s) or implausible. If that check later moves into the
+backend, it becomes a signal interlock next to `FLOAT_LOW` in the catalog.
 
 | `TELEMETRY_AUTO_REGISTER_SENSORS` | `true` | Create a disabled sensor for an unknown metric |
 | `TELEMETRY_MAX_CLOCK_SKEW_SECONDS` | `300` | Guards against an unsynced device clock |
@@ -559,7 +572,8 @@ interface. Entities are never returned from a controller.
 Honest list of what this phase does **not** do:
 
 1. **No automation.** `AutomationEngine` is a no-op and no agricultural threshold is hard-coded
-   anywhere. Automatically running a pump is a safety decision that waits for final specifications.
+   anywhere. Irrigation and dosing schedules and automatic mixing live in the AI team's separate
+   service, which uses the command API above.
 2. **No agronomic alerts.** Only infrastructure alerts (device offline, command failed) exist.
 3. **WebSocket does not scale past one instance.** The in-memory STOMP broker only reaches clients
    on the same instance; multiple instances need a broker relay.
@@ -582,14 +596,14 @@ still needed, and what is in place meanwhile:
 | # | Needed from | Decision | Meanwhile |
 |---|---|---|---|
 | 1 | Hardware | Final sensor set, units, sampling rate | Rev A catalog in `hardware/fertimata-rev-a.yml`; units still to verify on arrival |
-| 2 | Hardware | Final actuator set and command names | Rev A catalog with per-type command vocabularies, including the virtual patrol, goto and dosing-loop actuators (D2) |
+| 2 | Hardware | Final actuator set and command names | Rev A catalog with per-type command vocabularies, including the virtual patrol and goto actuators (D2); the dosing loop moved to the AI team's service |
 | 3 | Hardware + agronomy | Command parameter rules (e.g. maximum run time) | Configurable interlocks (incl. float LOW and pan-while-moving) + per-actuator `maxRunSeconds`; limits are the provisional §5.4 values until calibration |
 | 4 | Hardware | MQTT topic convention | Configurable templates; no topic string in code |
 | 5 | Firmware | Heartbeat interval → the offline timeout | Configurable, provisional default 120 s |
 | 6 | Hardware | Telemetry payload shape | Raw payload retained; metric keys resolved at runtime |
 | 7 | AI | Output contract: labels, boxes, image transport | Label is free text; extra fields kept in metadata |
 | 8 | Agronomy + AI | Whether cultivation is tracked per plant | `plant` minimal, `ai_detection.plant_id` nullable |
-| 9 | Agronomy | Thresholds and automation rules | Nothing evaluated; engine is a no-op |
+| 9 | Agronomy + AI | Thresholds, irrigation/dosing schedules | AI team's separate service via the command API; engine here is a no-op |
 | 10 | Operations | Downsampling for long-term history | Time-based retention purge; no aggregation |
 
 When one of these is answered, the change should be configuration or a small migration — not a
