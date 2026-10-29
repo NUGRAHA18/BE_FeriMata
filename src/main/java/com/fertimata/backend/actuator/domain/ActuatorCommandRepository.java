@@ -1,6 +1,7 @@
 package com.fertimata.backend.actuator.domain;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -11,6 +12,9 @@ import org.springframework.data.jpa.repository.Query;
 public interface ActuatorCommandRepository extends JpaRepository<ActuatorCommand, Long> {
 
     Optional<ActuatorCommand> findByCommandUid(String commandUid);
+
+    /** Perintah yang masih menunggu jawaban alat sejak sebelum {@code before}. */
+    List<ActuatorCommand> findByStatusInAndRequestedAtBefore(Collection<CommandStatus> statuses, Instant before);
 
     Page<ActuatorCommand> findByActuatorIdOrderByRequestedAtDesc(Long actuatorId, Pageable pageable);
 

@@ -10,8 +10,7 @@ import java.time.LocalDate;
  * @param currentPhase null bila HST di luar semua fase yang didefinisikan
  * @param nextPhase fase berikutnya, bila ada
  * @param daysUntilNextPhase null bila tidak ada fase berikutnya
- * @param plantCount semua tanaman aktif di siklus ini
- * @param treatmentPlantCount tanaman dengan kode perlakuan (K0 / N- / P- / K-)
+ * @param plantCount semua tanaman aktif
  */
 @Schema(name = "CycleStatus")
 public record CycleStatusResponse(
@@ -21,5 +20,4 @@ public record CycleStatusResponse(
         GrowthPhaseResponse currentPhase,
         GrowthPhaseResponse nextPhase,
         Long daysUntilNextPhase,
-        long plantCount,
-        long treatmentPlantCount) {}
+        long plantCount) {}

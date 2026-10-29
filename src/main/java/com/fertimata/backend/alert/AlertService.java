@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -35,16 +36,19 @@ public class AlertService {
     private final UserRepository userRepository;
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final JsonSupport jsonSupport;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AlertService(
             AlertRepository alertRepository,
             UserRepository userRepository,
             RealtimeEventPublisher realtimeEventPublisher,
-            JsonSupport jsonSupport) {
+            JsonSupport jsonSupport,
+            ApplicationEventPublisher eventPublisher) {
         this.alertRepository = alertRepository;
         this.userRepository = userRepository;
         this.realtimeEventPublisher = realtimeEventPublisher;
         this.jsonSupport = jsonSupport;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -65,6 +69,8 @@ public class AlertService {
 
         AlertResponse response = AlertResponse.from(saved);
         realtimeEventPublisher.publish(RealtimeEventType.ALERT_CREATED, response);
+        // Notifikasi push dikirim setelah commit, di luar transaksi ini (lihat PushNotificationService).
+        eventPublisher.publishEvent(new AlertRaisedEvent(response));
         return response;
     }
 

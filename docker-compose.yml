@@ -8,10 +8,18 @@
 #
 # Values come from .env; nothing secret is written in this file.
 
+# Same cap as deploy/: without it Docker's json-file logs grow without limit on a laptop left running.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: fertimata-postgres
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-fertimata}
       POSTGRES_USER: ${DATABASE_USERNAME:-fertimata}
@@ -29,6 +37,7 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: fertimata-mosquitto
+    logging: *default-logging
     ports:
       - "${MQTT_PORT:-1883}:1883"
     volumes:
@@ -41,6 +50,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: fertimata-backend
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,6 +71,14 @@ services:
 
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       WEBSOCKET_ALLOWED_ORIGINS: ${WEBSOCKET_ALLOWED_ORIGINS:-http://localhost:3000}
+
+      # Web Push for alerts (off until VAPID keys are set; see .env.example).
+      PUSH_ENABLED: ${PUSH_ENABLED:-false}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      PUSH_MIN_SEVERITY: ${PUSH_MIN_SEVERITY:-CRITICAL}
+      PUSH_TTL: ${PUSH_TTL:-24h}
 
       # Set MQTT_ENABLED=true in .env to exercise the real broker instead of the loopback transport.
       MQTT_ENABLED: ${MQTT_ENABLED:-true}

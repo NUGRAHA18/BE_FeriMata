@@ -70,7 +70,7 @@ services:
 
       # Telemetry retention: bounds sensor_reading / telemetry_message growth (see .env.example).
       TELEMETRY_RETENTION_ENABLED: ${TELEMETRY_RETENTION_ENABLED:-true}
-      TELEMETRY_READINGS_MAX_AGE: ${TELEMETRY_READINGS_MAX_AGE:-90d}
+      TELEMETRY_READINGS_MAX_AGE: ${TELEMETRY_READINGS_MAX_AGE:-30d}
       TELEMETRY_RAW_MESSAGES_MAX_AGE: ${TELEMETRY_RAW_MESSAGES_MAX_AGE:-7d}
       TELEMETRY_RETENTION_INTERVAL: ${TELEMETRY_RETENTION_INTERVAL:-1h}
 
@@ -85,6 +85,14 @@ services:
       # Every origin a browser may open the dashboard from (tunnel hostname and LAN address).
       FRONTEND_URL: ${PUBLIC_ORIGINS:?PUBLIC_ORIGINS is required}
       WEBSOCKET_ALLOWED_ORIGINS: ${PUBLIC_ORIGINS:?PUBLIC_ORIGINS is required}
+
+      # Web Push for alerts (off until VAPID keys are set; needs HTTPS in the browser; see .env.example).
+      PUSH_ENABLED: ${PUSH_ENABLED:-false}
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      PUSH_MIN_SEVERITY: ${PUSH_MIN_SEVERITY:-CRITICAL}
+      PUSH_TTL: ${PUSH_TTL:-24h}
 
       MQTT_ENABLED: "true"
       MQTT_BROKER_URL: tcp://mosquitto:1883

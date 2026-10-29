@@ -1,5 +1,6 @@
 package com.fertimata.backend.alert;
 
+import com.fasterxml.jackson.annotation.JsonRawValue;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
@@ -21,7 +22,12 @@ public record AlertResponse(
         boolean acknowledged,
         String acknowledgedBy,
         Instant acknowledgedAt,
-        Instant createdAt) {
+        Instant createdAt,
+        @JsonRawValue
+                @Schema(
+                        type = "object",
+                        description = "Machine-readable details, e.g. failureCode (NO_RESPONSE, INTERLOCK_POWER, ...), commandUid; route on these, not on the message text")
+                String metadata) {
 
     public static AlertResponse from(Alert alert) {
         return new AlertResponse(
@@ -40,6 +46,7 @@ public record AlertResponse(
                 alert.isAcknowledged(),
                 alert.getAcknowledgedBy() == null ? null : alert.getAcknowledgedBy().getUsername(),
                 alert.getAcknowledgedAt(),
-                alert.getCreatedAt());
+                alert.getCreatedAt(),
+                alert.getMetadata());
     }
 }

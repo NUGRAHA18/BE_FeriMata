@@ -40,6 +40,9 @@ class AlertServiceTest {
     @Mock
     private JsonSupport jsonSupport;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private AlertService alertService;
 

@@ -3,13 +3,12 @@ package com.fertimata.backend.cultivation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fertimata.backend.common.exception.BusinessRuleException;
 import com.fertimata.backend.cultivation.dto.CycleStatusResponse;
-import com.fertimata.backend.cultivation.dto.GrowthPhaseRequest;
-import com.fertimata.backend.cultivation.dto.PlantingCycleRequest;
-import com.fertimata.backend.cultivation.dto.PlantingCycleResponse;
 import com.fertimata.backend.plant.PlantRepository;
 import com.fertimata.backend.support.TestFixtures;
 import java.math.BigDecimal;
@@ -46,12 +45,16 @@ class CultivationServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Sama dengan application.yml: FASE_MF fuzzy AI.
         CultivationProperties properties = new CultivationProperties(
                 WIB,
                 List.of(
-                        template("VEGETATIVE", 0, 24, "5.4", "6.3"),
-                        template("YOUNG_FRUIT", 25, 44, "4.1", "7.9"),
-                        template("FRUIT_ENLARGEMENT", 45, null, "5.4", "4.7")));
+                        template("SEMAI", 0, 7),
+                        template("VEGETATIF", 8, 24),
+                        template("PEMBUNGAAN", 25, 34),
+                        template("PEMBUAHAN", 35, 60),
+                        template("PEMATANGAN", 61, 74),
+                        template("PANEN", 75, null)));
         service = new CultivationService(cycleRepository, plantRepository, properties, Clock.fixed(NOW, ZoneId.of("UTC")));
         when(cycleRepository.save(any(PlantingCycle.class))).thenAnswer(inv -> {
             PlantingCycle c = inv.getArgument(0);
@@ -63,44 +66,66 @@ class CultivationServiceTest {
     @Test
     @DisplayName("HST counts days since transplant in WIB, and today's phase comes from the HST")
     void hstAndPhaseToday() {
-        PlantingCycle cycle = new PlantingCycle("MT-2026-09", "Musim 1", LocalDate.of(2026, 9, 12));
-        TestFixtures.setId(cycle, 1L);
-        cycle.setStatus(CycleStatus.ACTIVE);
-        cycle.replacePhases(service.create(new PlantingCycleRequest(
-                                "TMP", "tmp", null, LocalDate.of(2026, 9, 12), null, null, false, null))
-                        .phases().stream()
-                        .map(p -> phase(p.code(), p.startHst(), p.endHst()))
-                        .toList());
-        when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.of(cycle));
-        when(plantRepository.countByCycleIdAndActiveTrue(1L)).thenReturn(156L);
-        when(plantRepository.countByCycleIdAndActiveTrueAndTreatmentCodeIsNotNull(1L)).thenReturn(48L);
+        when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.empty());
+        CycleStatusResponse created = service.setTransplantDate(LocalDate.of(2026, 9, 12));
+        when(plantRepository.countByActiveTrue()).thenReturn(5L);
 
-        CycleStatusResponse status = service.activeStatus().orElseThrow();
-
-        assertThat(status.today()).isEqualTo(LocalDate.of(2026, 10, 20));
-        assertThat(status.hst()).isEqualTo(38);
-        assertThat(status.currentPhase().code()).isEqualTo("YOUNG_FRUIT");
-        assertThat(status.nextPhase().code()).isEqualTo("FRUIT_ENLARGEMENT");
-        assertThat(status.daysUntilNextPhase()).isEqualTo(7);
-        assertThat(status.plantCount()).isEqualTo(156);
-        assertThat(status.treatmentPlantCount()).isEqualTo(48);
+        assertThat(created.today()).isEqualTo(LocalDate.of(2026, 10, 20));
+        assertThat(created.hst()).isEqualTo(38);
+        assertThat(created.currentPhase().code()).isEqualTo("PEMBUAHAN");
+        assertThat(created.currentPhase().ecTargetMin()).isEqualByComparingTo("1.2");
+        assertThat(created.nextPhase().code()).isEqualTo("PEMATANGAN");
+        assertThat(created.daysUntilNextPhase()).isEqualTo(23);
     }
 
     @Test
-    @DisplayName("a cycle created without phases gets the configured template, and activating it ends the previous one")
-    void createUsesTemplateAndEndsPreviousActive() {
-        PlantingCycle previous = new PlantingCycle("OLD", "Lama", LocalDate.of(2026, 5, 1));
-        previous.setStatus(CycleStatus.ACTIVE);
-        when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.of(previous));
+    @DisplayName("setting the transplant date creates the greenhouse cycle with the template phases when none exists")
+    void transplantDateCreatesCycle() {
+        when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.empty());
 
-        PlantingCycleResponse created = service.create(new PlantingCycleRequest(
-                "MT-2026-09", "Musim 1", "Netted", LocalDate.of(2026, 9, 12), null, null, null, null));
+        CycleStatusResponse status = service.setTransplantDate(LocalDate.of(2026, 9, 12));
 
-        assertThat(created.status()).isEqualTo(CycleStatus.ACTIVE);
-        assertThat(created.phases()).extracting("code").containsExactly("VEGETATIVE", "YOUNG_FRUIT", "FRUIT_ENLARGEMENT");
-        assertThat(created.phases().get(1).ratioK()).isEqualByComparingTo("7.9");
-        assertThat(previous.getStatus()).isEqualTo(CycleStatus.ENDED);
-        assertThat(previous.getEndedAt()).isEqualTo(LocalDate.of(2026, 10, 20));
+        assertThat(status.cycle().code()).isEqualTo("MT-2026-09-12");
+        assertThat(status.cycle().status()).isEqualTo(CycleStatus.ACTIVE);
+        assertThat(status.cycle().phases()).extracting("code")
+                .containsExactly("SEMAI", "VEGETATIF", "PEMBUNGAAN", "PEMBUAHAN", "PEMATANGAN", "PANEN");
+    }
+
+    @Test
+    @DisplayName("setting the transplant date again moves the existing cycle instead of starting a new one")
+    void transplantDateUpdatesActiveCycle() {
+        PlantingCycle active = new PlantingCycle("MT-2026-09-12", "Musim", LocalDate.of(2026, 9, 12));
+        TestFixtures.setId(active, 1L);
+        active.setStatus(CycleStatus.ACTIVE);
+        active.replacePhases(List.of(phase("VEGETATIF", 8, 24), phase("PEMBUNGAAN", 25, 34)));
+        when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.of(active));
+
+        CycleStatusResponse status = service.setTransplantDate(LocalDate.of(2026, 10, 1));
+
+        assertThat(status.cycle().transplantDate()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(status.hst()).isEqualTo(19);
+        assertThat(status.currentPhase().code()).isEqualTo("VEGETATIF");
+        verify(cycleRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("resetting the transplant date ends the active cycle; the next date starts a new one")
+    void resetEndsActiveCycle() {
+        PlantingCycle active = new PlantingCycle("MT-2026-09-12", "Musim", LocalDate.of(2026, 9, 12));
+        active.setStatus(CycleStatus.ACTIVE);
+        when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.of(active));
+
+        assertThat(service.resetTransplantDate()).isTrue();
+        assertThat(active.getStatus()).isEqualTo(CycleStatus.ENDED);
+        assertThat(active.getEndedAt()).isEqualTo(LocalDate.of(2026, 10, 20));
+    }
+
+    @Test
+    @DisplayName("without a transplant date there is no status")
+    void noTransplantDate() {
+        when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.empty());
+
+        assertThat(service.activeStatus()).isEmpty();
     }
 
     @Test
@@ -130,22 +155,6 @@ class CultivationServiceTest {
         assertThat(cycle.phaseAt(12).orElseThrow().getCode()).isEqualTo("B");
     }
 
-    @Test
-    @DisplayName("phase requests are normalised and validated")
-    void replacePhasesFromRequests() {
-        PlantingCycle cycle = new PlantingCycle("C", "c", LocalDate.of(2026, 10, 1));
-        TestFixtures.setId(cycle, 7L);
-        when(cycleRepository.findWithPhasesById(7L)).thenReturn(Optional.of(cycle));
-
-        PlantingCycleResponse response = service.replacePhases(
-                7L,
-                List.of(
-                        new GrowthPhaseRequest("late", "Akhir", 30, null, null, null, null, null, null, null),
-                        new GrowthPhaseRequest("early", "Awal", 0, 29, new BigDecimal("1.5"), new BigDecimal("1.8"), null, null, null, null)));
-
-        assertThat(response.phases()).extracting("code").containsExactly("EARLY", "LATE");
-    }
-
     private static GrowthPhase phase(String code, int start, Integer end) {
         GrowthPhase p = new GrowthPhase();
         p.setCode(code);
@@ -155,8 +164,8 @@ class CultivationServiceTest {
         return p;
     }
 
-    private static CultivationProperties.PhaseTemplate template(String code, int start, Integer end, String n, String k) {
+    private static CultivationProperties.PhaseTemplate template(String code, int start, Integer end) {
         return new CultivationProperties.PhaseTemplate(
-                code, code, start, end, new BigDecimal("1.5"), new BigDecimal("2.0"), new BigDecimal(n), BigDecimal.ONE, new BigDecimal(k), null);
+                code, code, start, end, new BigDecimal("1.2"), new BigDecimal("2.5"), null);
     }
 }

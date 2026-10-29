@@ -12,6 +12,16 @@ public enum RealtimeEventType {
     DEVICE_STATUS_CHANGED("/topic/devices"),
     ACTUATOR_STATUS_CHANGED("/topic/actuators"),
     ACTUATOR_COMMAND_UPDATED("/topic/actuators/commands"),
+    /**
+     * Data master aktuator berubah (didaftarkan, nama, enabled, maxRunSeconds) - bukan state yang
+     * dilaporkan perangkat. Payload sama dengan {@code GET /api/actuators/{id}}.
+     */
+    ACTUATOR_UPDATED("/topic/actuators"),
+    /**
+     * Data master sensor berubah: didaftarkan (termasuk otomatis dari telemetri), nama/tipe/satuan
+     * diubah, atau diaktifkan/dinonaktifkan. Payload sama dengan {@code GET /api/sensors/{id}}.
+     */
+    SENSOR_UPDATED("/topic/sensors"),
     ALERT_CREATED("/topic/alerts"),
     /** Alert yang sudah ada berubah, saat ini hanya karena di-acknowledge operator. */
     ALERT_UPDATED("/topic/alerts"),

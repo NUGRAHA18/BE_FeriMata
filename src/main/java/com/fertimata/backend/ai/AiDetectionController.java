@@ -22,9 +22,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class AiDetectionController {
 
     private final AiDetectionService detectionService;
+    private final AiInputsService aiInputsService;
 
-    public AiDetectionController(AiDetectionService detectionService) {
+    public AiDetectionController(AiDetectionService detectionService, AiInputsService aiInputsService) {
         this.detectionService = detectionService;
+        this.aiInputsService = aiInputsService;
+    }
+
+    @GetMapping("/inputs")
+    @Operation(
+            summary = "Sensor snapshot for the AI service's fuzzy forms",
+            description = "Field names match the AI service forms (run_fertilization, run_irrigation). Calibrated values "
+                    + "when available. A field whose reading is missing or older than app.ai.inputs.max-age is null and "
+                    + "listed in problems; do not dose unless readyForFertilization is true (safety rule S9).")
+    public AiInputsResponse inputs() {
+        return aiInputsService.inputs();
     }
 
     @GetMapping("/detections")

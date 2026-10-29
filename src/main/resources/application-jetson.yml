@@ -25,10 +25,12 @@ app:
   telemetry:
     # Masih nyala: metric yang nggak dikenal jadi sensor placeholder (disabled), biar datanya tetap ke-simpan buat ditinjau.
     auto-register-sensors: ${TELEMETRY_AUTO_REGISTER_SENSORS:true}
-    # NVMe Jetson dibagi sama OS, model vision, dan database. 90 hari pembacaan ≈ satu musim tanam;
-    # payload mentah cukup seminggu buat debugging edge agent.
+    # NVMe Jetson dibagi sama OS, model vision, dan database. Pembacaan mentah ±200 ribu baris/hari
+    # (PZEM tiap 3 s mendominasi): 30 hari ≈ 3 GB, 90 hari ≈ 9-10 GB. Grafik satu musim memakai ringkasan
+    # per jam (sensor_reading_hourly, tidak dihapus), jadi 30 hari cukup untuk grafik per menit dan
+    # metrik sistem. Payload mentah cukup seminggu buat debugging edge agent.
     retention:
-      readings-max-age: ${TELEMETRY_READINGS_MAX_AGE:90d}
+      readings-max-age: ${TELEMETRY_READINGS_MAX_AGE:30d}
       raw-messages-max-age: ${TELEMETRY_RAW_MESSAGES_MAX_AGE:7d}
       # Batch lebih kecil: CPU dibagi dengan inferensi.
       batch-size: ${TELEMETRY_RETENTION_BATCH_SIZE:2000}

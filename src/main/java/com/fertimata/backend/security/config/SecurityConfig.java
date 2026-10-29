@@ -83,6 +83,9 @@ public class SecurityConfig {
                     }
                     // Siapa pun yang masuk boleh mengganti sandinya sendiri.
                     requests.requestMatchers(HttpMethod.POST, "/api/auth/change-password").authenticated();
+                    // Langganan notifikasi hanya menyangkut HP si pengguna, bukan data kebun; VIEWER juga
+                    // perlu peringatan darurat.
+                    requests.requestMatchers("/api/push/**").authenticated();
                     // Kelola akun hanya ADMIN.
                     requests.requestMatchers("/api/users/**").hasRole(Role.Names.ADMIN);
                     // VIEWER hanya membaca: setiap permintaan yang mengubah data butuh OPERATOR (ADMIN

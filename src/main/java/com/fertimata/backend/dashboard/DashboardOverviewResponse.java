@@ -44,8 +44,7 @@ public record DashboardOverviewResponse(
             GrowthPhaseResponse currentPhase,
             GrowthPhaseResponse nextPhase,
             Long daysUntilNextPhase,
-            long plantCount,
-            long treatmentPlantCount) {}
+            long plantCount) {}
 
     /**
      * How the backend itself is running.
@@ -90,5 +89,12 @@ public record DashboardOverviewResponse(
             @Schema(example = "DIST-PUMP") String actuatorCode,
             @Schema(example = "PANEL-01") String deviceCode,
             @Schema(example = "operator") String actor,
-            @Schema(description = "Alert id for ALERT entries, command id for ACTUATOR_COMMAND entries") Long refId) {}
+            @Schema(description = "Alert id for ALERT entries, command id for ACTUATOR_COMMAND entries") Long refId,
+            @Schema(
+                            example = "NO_RESPONSE",
+                            description = "ACTUATOR_COMMAND: failure code of a FAILED command; ALERT: metadata.failureCode, "
+                                    + "or metadata.reasonCode (e.g. BACKUP_POWER for IRRIGATION_SKIPPED); otherwise null")
+                    String failureCode,
+            @Schema(example = "IRRIGATION_SKIPPED", description = "Alert type for ALERT entries; null for commands")
+                    String alertType) {}
 }

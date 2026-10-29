@@ -75,7 +75,8 @@ class DashboardServiceTest {
                 alertService,
                 aiDetectionService,
                 cultivationService,
-                new AppProperties(AppProperties.Mode.DEVELOPMENT));
+                new AppProperties(AppProperties.Mode.DEVELOPMENT),
+                new com.fertimata.backend.common.util.JsonSupport(tools.jackson.databind.json.JsonMapper.builder().build()));
     }
 
     @Test
@@ -149,6 +150,7 @@ class DashboardServiceTest {
                 false,
                 null,
                 null,
-                Instant.now());
+                Instant.now(),
+                null);
     }
 }

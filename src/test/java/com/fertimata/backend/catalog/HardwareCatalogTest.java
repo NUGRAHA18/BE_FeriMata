@@ -18,7 +18,6 @@ import com.fertimata.backend.common.util.JsonSupport;
 import com.fertimata.backend.config.PowerProperties;
 import com.fertimata.backend.device.Device;
 import com.fertimata.backend.device.DeviceRepository;
-import com.fertimata.backend.metrics.MetricsProperties;
 import com.fertimata.backend.sensor.Sensor;
 import com.fertimata.backend.sensor.SensorRepository;
 import com.fertimata.backend.support.TestFixtures;
@@ -80,7 +79,8 @@ class HardwareCatalogTest {
 
         HardwareCatalogProperties.ActuatorEntry dosingN = catalog.devices().get(4).actuators().get(0);
         assertThat(dosingN.metadata()).containsEntry("modbusAddress", "21").containsEntry("channel", "R0");
-        assertThat(dosingN.maxRunSeconds()).isEqualTo(120);
+        // Batas atas keluaran fuzzy pupuk AI.
+        assertThat(dosingN.maxRunSeconds()).isEqualTo(150);
         HardwareCatalogProperties.ActuatorEntry pan = catalog.devices().get(2).actuators().get(1);
         assertThat(pan.type()).isEqualTo("CAMERA_PAN");
         assertThat(pan.metadata()).containsEntry("channel", "R1");
@@ -199,23 +199,6 @@ class HardwareCatalogTest {
                     assertThat(station.min()).isEqualByComparingTo("1");
                     assertThat(station.max()).isEqualByComparingTo("10");
                 });
-    }
-
-    @Test
-    @DisplayName("per-device telemetry intervals bind and only name catalog devices")
-    void bindsTelemetryIntervals() {
-        HardwareCatalogProperties catalog =
-                binder.bind("app.catalog", HardwareCatalogProperties.class).get();
-        MetricsProperties metrics = binder.bind("app.metrics", MetricsProperties.class).get();
-
-        assertThat(metrics.intervalsFor("PZEM-01")).containsExactly(Duration.ofSeconds(3));
-        assertThat(metrics.intervalsFor("GREENHOUSE-01")).containsExactly(Duration.ofSeconds(60), Duration.ofMinutes(5));
-        assertThat(metrics.intervalsFor("RIO-TANK-01"))
-                .containsExactly(Duration.ofSeconds(5), Duration.ofMinutes(10));
-        metrics.deviceIntervals().forEach(entry -> assertThat(catalog.devices())
-                .extracting(HardwareCatalogProperties.DeviceEntry::code)
-                .as(entry.device())
-                .contains(entry.device()));
     }
 
     @Test

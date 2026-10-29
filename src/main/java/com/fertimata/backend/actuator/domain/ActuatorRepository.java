@@ -9,6 +9,9 @@ public interface ActuatorRepository extends JpaRepository<Actuator, Long> {
 
     Optional<Actuator> findByDeviceIdAndCode(Long deviceId, String code);
 
+    /** Kode aktuator unik di katalog Rev A; dipakai jadwal siram untuk menemukan pompanya. */
+    Optional<Actuator> findFirstByCode(String code);
+
     List<Actuator> findByDeviceIdOrderByCodeAsc(Long deviceId);
 
     @Query("select a from Actuator a join fetch a.device order by a.code asc")

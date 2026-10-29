@@ -66,7 +66,7 @@ app:
           metrics:
             - { key: soil_a.moisture, min: 55, max: 75, scale: 1 }
             - { key: soil_a.temperature, min: 25, max: 30, scale: 1 }
-            - { key: soil_a.ec, min: 900, max: 1600, scale: 0 }
+            - { key: soil_a.ec, min: 0.9, max: 1.6, scale: 2 }   # mS/cm (V12, ikut fuzzy AI)
             - { key: soil_a.ph, min: 6.0, max: 6.8, scale: 2 }
             - { key: soil_a.nitrogen, min: 40, max: 90, scale: 0 }
             - { key: soil_a.phosphorus, min: 15, max: 40, scale: 0 }

@@ -9,7 +9,6 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.fertimata.backend.automation.AutomationEngine;
 import com.fertimata.backend.common.exception.TelemetryValidationException;
 import com.fertimata.backend.common.util.JsonSupport;
 import com.fertimata.backend.config.TelemetryProperties;
@@ -64,9 +63,6 @@ class TelemetryIngestServiceTest {
     private RealtimeEventPublisher realtimeEventPublisher;
 
     @Mock
-    private AutomationEngine automationEngine;
-
-    @Mock
     private JsonSupport jsonSupport;
 
     private TelemetryIngestService ingestService;
@@ -81,7 +77,6 @@ class TelemetryIngestServiceTest {
                 deviceService,
                 sensorService,
                 realtimeEventPublisher,
-                automationEngine,
                 properties,
                 jsonSupport);
 
@@ -131,7 +126,6 @@ class TelemetryIngestServiceTest {
 
         verify(realtimeEventPublisher).publish(eq(RealtimeEventType.SENSOR_READING_UPDATED), any());
         verify(deviceService).recordContact(eq(device), any(), any());
-        verify(automationEngine, org.mockito.Mockito.times(2)).evaluate(any());
     }
 
     @Test
@@ -187,7 +181,6 @@ class TelemetryIngestServiceTest {
                 deviceService,
                 sensorService,
                 realtimeEventPublisher,
-                automationEngine,
                 tiny,
                 jsonSupport);
 

@@ -16,9 +16,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -38,11 +43,18 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 public class SensorCalibrationController {
 
+    private static final MediaType CSV = new MediaType("text", "csv", StandardCharsets.UTF_8);
+
     private final SensorCalibrationService service;
+    private final CalibrationSampleCsvExporter csvExporter;
     private final CurrentUserProvider currentUserProvider;
 
-    public SensorCalibrationController(SensorCalibrationService service, CurrentUserProvider currentUserProvider) {
+    public SensorCalibrationController(
+            SensorCalibrationService service,
+            CalibrationSampleCsvExporter csvExporter,
+            CurrentUserProvider currentUserProvider) {
         this.service = service;
+        this.csvExporter = csvExporter;
         this.currentUserProvider = currentUserProvider;
     }
 
@@ -87,6 +99,16 @@ public class SensorCalibrationController {
             @PathVariable Long sensorId, @Valid @RequestBody CalibrationSampleRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(service.addSample(sensorId, request, currentUserProvider.username().orElse(null)));
+    }
+
+    @GetMapping("/calibration-samples.csv")
+    @Operation(summary = "Paired lab samples of a sensor as CSV", description = "UTF-8 with BOM, times in WIB; covariates become columns.")
+    public ResponseEntity<byte[]> samplesCsv(@PathVariable Long sensorId) {
+        String filename = "fertimata-sampel-kalibrasi-%d-%s.csv".formatted(sensorId, LocalDate.now());
+        return ResponseEntity.ok()
+                .contentType(CSV)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(filename).build().toString())
+                .body(csvExporter.export(sensorId));
     }
 
     @DeleteMapping("/calibration-samples/{sampleId}")

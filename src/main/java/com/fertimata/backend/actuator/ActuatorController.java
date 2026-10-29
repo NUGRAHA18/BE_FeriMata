@@ -56,9 +56,15 @@ public class ActuatorController {
     }
 
     @GetMapping
-    @Operation(summary = "List actuators")
-    public List<ActuatorResponse> list(@RequestParam(required = false) Long deviceId) {
-        return deviceId == null ? actuatorService.list() : actuatorService.listByDevice(deviceId);
+    @Operation(
+            summary = "List actuators",
+            description = "Disabled actuators (not installed or retired) are left out unless includeDisabled=true, "
+                    + "which the settings screen uses to re-enable one.")
+    public List<ActuatorResponse> list(
+            @RequestParam(required = false) Long deviceId,
+            @RequestParam(defaultValue = "false") boolean includeDisabled) {
+        List<ActuatorResponse> actuators = deviceId == null ? actuatorService.list() : actuatorService.listByDevice(deviceId);
+        return includeDisabled ? actuators : actuators.stream().filter(ActuatorResponse::enabled).toList();
     }
 
     @GetMapping("/{id}")
@@ -116,6 +122,15 @@ public class ActuatorController {
         ActuatorCommandResponse response =
                 commandService.issueOperatorCommand(id, request, currentUserProvider.requireUsername());
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    @GetMapping("/commands/{commandUid}")
+    @Operation(
+            summary = "Get one command by its commandUid",
+            description = "The commandUid is returned by POST /api/actuators/{id}/commands. Poll it until status is "
+                    + "EXECUTED or FAILED (failureCode tells why, e.g. NO_RESPONSE, INTERLOCK_POWER).")
+    public ActuatorCommandResponse command(@PathVariable String commandUid) {
+        return commandService.byUid(commandUid);
     }
 
     @GetMapping("/{id}/commands")

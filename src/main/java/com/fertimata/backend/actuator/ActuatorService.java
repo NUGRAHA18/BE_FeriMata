@@ -95,7 +95,7 @@ public class ActuatorService {
         actuator.setMetadata(jsonSupport.toJson(request.metadata()));
         Actuator saved = actuatorRepository.save(actuator);
         log.info("Actuator registered: {} on device {}", saved.getCode(), device.getDeviceCode());
-        return toResponse(saved);
+        return publishUpdated(saved);
     }
 
     @Transactional
@@ -125,7 +125,7 @@ public class ActuatorService {
                 actuator.getDevice().getDeviceCode(),
                 actuator.isEnabled(),
                 actuator.getMaxRunSeconds());
-        return toResponse(actuator);
+        return publishUpdated(actuator);
     }
 
     /**
@@ -165,6 +165,13 @@ public class ActuatorService {
     @Transactional(readOnly = true)
     public long countAll() {
         return actuatorRepository.count();
+    }
+
+    /** Operator lain yang sedang membuka dashboard langsung melihat perubahan tanpa reload. */
+    private ActuatorResponse publishUpdated(Actuator actuator) {
+        ActuatorResponse response = toResponse(actuator);
+        realtimeEventPublisher.publish(RealtimeEventType.ACTUATOR_UPDATED, response);
+        return response;
     }
 
     private ActuatorResponse toResponse(Actuator actuator) {

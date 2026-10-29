@@ -168,7 +168,6 @@ and `.env.example` documents every variable.
 | `ACTUATOR_REFUSE_WHEN_DEVICE_OFFLINE` | `false` (`true` under `jetson`) | Refuse activating commands for a device that is not ONLINE |
 | `ACTUATOR_COMMAND_TTL` | empty (`30s` under `jetson`, `60s` under `dev`) | Adds `expiresAt` to commands; the edge agent discards late ones |
 | `CAPTURES_DIR` | empty | Edge agent's photo folder (`camera.root`), served read-only at `/captures/**` with the same authentication as the API. Empty disables it. The Jetson compose file mounts `CAPTURES_HOST_DIR` (default `/var/lib/fertimata/data/citra`) |
-| `METRICS_EXPECTED_TELEMETRY_INTERVAL` | `30s` | Completeness baseline for devices without their own entry in the catalog's `app.metrics.device-intervals` |
 
 Each actuator type has a command vocabulary in the catalog (`app.actuator.commands`): relays accept
 `ON`/`OFF`; the virtual actuators accept the high-level commands below and are run as a sequence by the
@@ -183,12 +182,17 @@ the accepted names as `supportedCommands`.
 `STOP` and `OFF` are never held by an interlock. A virtual command is `EXECUTED` when the edge
 acknowledges that the sequence **started**; the end is the actuator's reported state returning to `OFF`.
 
-Automatic fertilizer mixing and irrigation/dosing schedules are **not** part of this backend or the
-edge agent: they belong to the AI team's separate service. That service logs in like any operator
-(an `OPERATOR` account) and drives the pumps through the same API, e.g.
-`POST /api/actuators/{id}/commands` with `{"command": "ON", "parameters": {"durationSeconds": 12}}`
-for `DOSING-N`/`-P`/`-K`, `STIRRER` and `DIST-PUMP`, so every interlock and run-time limit still applies.
-It reads the solution EC/pH and float state from `/api/sensors/{id}/latest`. The earlier `DOSING-LOOP` actuator and
+**Watering schedule (backend, since 29 Oct 2026).** Daily watering times are stored in
+`irrigation_schedule` and set from the app (`/api/irrigation/schedules`). At each time the backend
+issues `ON` with `durationSeconds` to `DIST-PUMP` (`app.irrigation.actuator-code`) as a `SYSTEM` command,
+so every interlock applies; a refused run is recorded as `SKIPPED` and raises an `IRRIGATION_SKIPPED`
+warning, and a time missed while the backend was down by more than `IRRIGATION_GRACE` (15 min) is not
+watered late. `IRRIGATION_SCHEDULE_ENABLED=false` pauses every schedule.
+
+**Automatic fertilizer mixing and dosing** are **not** part of this backend or the edge agent: they
+belong to the AI team's service. It logs in as an `OPERATOR` account (e.g. `layanan-ai`) and drives
+`DOSING-N`/`-P`/`-K` and `STIRRER` through `POST /api/actuators/{id}/commands`, reading its inputs from
+`GET /api/ai/inputs` and following each step with `GET /api/actuators/commands/{commandUid}`. The earlier `DOSING-LOOP` actuator and
 its `dosing.*` metrics are disabled by migration V9.
 
 **Safety rule S9 is the AI service's responsibility.** Neither the backend nor the edge agent refuses a
@@ -211,11 +215,42 @@ for long.
 | Variable | Default | Notes |
 |---|---|---|
 | `TELEMETRY_RETENTION_ENABLED` | `true` | `false` keeps everything forever |
-| `TELEMETRY_READINGS_MAX_AGE` | `30d` (`7d` under `dev`, `90d` under `jetson`) | Age of `sensor_reading` rows, by `recorded_at` |
+| `TELEMETRY_READINGS_MAX_AGE` | `30d` (`7d` under `dev`) | Age of `sensor_reading` rows, by `recorded_at`. Older history is only available hourly |
 | `TELEMETRY_RAW_MESSAGES_MAX_AGE` | `3d` (`1d` under `dev`, `7d` under `jetson`) | Age of raw `telemetry_message` rows, by `received_at` |
 | `TELEMETRY_RETENTION_INTERVAL` | `1h` | How often the purge runs |
 | `TELEMETRY_RETENTION_BATCH_SIZE` | `5000` (`2000` under `jetson`) | Rows per delete transaction |
 | `TELEMETRY_RETENTION_MAX_BATCHES_PER_RUN` | `40` | Ceiling per run; a large backlog drains over several runs |
+
+### Long-term history (hourly rollups)
+
+`sensor_reading_hourly` keeps count/sum/min/max per sensor per hour and is **not** purged by
+retention (~24 rows per sensor per day), so charts can cover a whole season. `SensorReadingRollupJob`
+recomputes every hour that received readings within the lookback, including late readings an edge
+buffer flushes after an outage. Migration V10 fills it from the readings that exist at upgrade time.
+
+| Variable | Default | Notes |
+|---|---|---|
+| `TELEMETRY_ROLLUP_INTERVAL` | `15m` | How often rollups are refreshed; long-range charts lag by at most this much |
+| `TELEMETRY_ROLLUP_LOOKBACK` | `2h` | Hours that received data within this window are recomputed; keep it longer than the interval |
+
+### Push notifications (Web Push)
+
+Alerts at or above `PUSH_MIN_SEVERITY` are sent to every subscribed phone or browser after they are
+committed, on a background thread, with `Urgency: high` for `CRITICAL`. Payloads are encrypted per
+subscription (RFC 8291) and signed with VAPID (RFC 8292) using only JDK cryptography. Subscriptions
+the push service reports as gone (404/410) are deleted. Only endpoints on known push services
+(FCM, Mozilla, WNS, Apple) can be registered, so the backend cannot be pointed at internal addresses.
+
+Browsers only allow push on **HTTPS** (or `http://localhost`); a dashboard opened as `http://<LAN IP>`
+cannot subscribe. On iPhone the PWA must be added to the home screen (iOS 16.4+).
+
+| Variable | Default | Notes |
+|---|---|---|
+| `PUSH_ENABLED` | `false` | Startup fails if `true` and the keys or subject are missing or not a pair |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | — | Generate once: `npx web-push generate-vapid-keys`. Changing them drops every subscription |
+| `VAPID_SUBJECT` | — | `mailto:...` or `https://...`; push services (Apple in particular) require it |
+| `PUSH_MIN_SEVERITY` | `CRITICAL` | `INFO`, `WARNING` or `CRITICAL` |
+| `PUSH_TTL` | `24h` | How long the push service keeps a notification for a phone that is off |
 
 Application logs are **not** stored in the database. They go to stdout (Docker's json-file driver,
 capped at 10 MB x 3 per container in `deploy/docker-compose.yml`).
@@ -238,10 +273,16 @@ telemetry_message   raw inbound payloads (jsonb), including rejected ones
 sensor_reading      one normalised row per metric per message (message link nulled once the raw payload is purged)
 actuator_command    append-only audit: who, what, when, manual or automatic, did it work
 alert               operational alerts and acknowledgement
-plant               minimal; per-plant tracking is not a settled requirement
+plant               plants shown on the dashboard (name, notes); no research attributes since V14
+planting_cycle      hidden: holds the transplant date; growth_phase holds the AI fuzzy phases + EC target
+irrigation_schedule daily watering times run by the backend (V13)
+push_subscription   browsers that accepted push notifications
+sensor_reading_hourly  hourly min/avg/max kept after raw readings are purged
 ai_detection        results from the vision model on the device
-automation_rule     storage for phase 2; nothing evaluates it yet
 ```
+
+Removed on 29 Oct 2026 (V14) when the app was refocused on control: plant observations, harvest
+records, the never-used `automation_rule`, plant research columns and N:P:K ratios per phase.
 
 There is no pH column, no NPK table and no pump table. Adding an instrument is data, not a
 migration — that is the point.
@@ -328,6 +369,27 @@ AI detection:
 Base path `/api`. Every endpoint except login requires `Authorization: Bearer <token>`.
 Full documentation: **<http://localhost:8080/swagger-ui.html>**
 
+### OpenAPI file and Postman
+
+[`openapi/fertimata-openapi.json`](openapi/fertimata-openapi.json) is the OpenAPI 3.1 spec exported from
+the running backend (group `semua`, every endpoint).
+[`openapi/fertimata-openapi-layanan-ai.json`](openapi/fertimata-openapi-layanan-ai.json) is the group
+`layanan-ai`: only what the AI team's service uses (login, `/api/ai/inputs`, HST, pumps, commands, command
+status, health), with the call order in its description. Hand that one to the AI team as its own Postman collection. To use it in Postman: **Import → File → `fertimata-openapi.json`**, then set the
+collection's `baseUrl` to `http://localhost:8080` (laptop) or `http://<jetson-ip>` (Jetson, through Caddy),
+and set the Bearer token on the collection from `POST /api/auth/login` → `accessToken`.
+
+Re-export it after changing an endpoint (the dev backend must be running; `/v3/api-docs` is public only in
+`DEVELOPMENT` mode):
+
+```bash
+curl -s http://localhost:8080/v3/api-docs/semua      | python -m json.tool > openapi/fertimata-openapi.json
+curl -s http://localhost:8080/v3/api-docs/layanan-ai | python -m json.tool > openapi/fertimata-openapi-layanan-ai.json
+```
+
+The groups are defined in `config/OpenApiConfig.java`; add a path to the `layanan-ai` group there when the AI
+service starts using a new endpoint. Swagger UI shows both groups in its top-right selector.
+
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/auth/login` | Sign in, receive a JWT |
@@ -340,6 +402,7 @@ Full documentation: **<http://localhost:8080/swagger-ui.html>**
 | `GET` | `/api/sensors/{id}` | One sensor |
 | `GET` | `/api/sensors/{id}/latest` | Most recent reading |
 | `GET` | `/api/sensors/{id}/history` | Readings (`?from=&to=&page=&size=`, default last 24 h) |
+| `GET` | `/api/sensors/{id}/history/aggregate` | Min/avg/max per point (`?from=&to=&interval=`, default last 7 days, ~300 points). `interval`: `1m` `5m` `15m` `30m` `1h` `3h` `6h` `12h` `1d` `7d`; `1h`+ also covers data past retention |
 | `POST` | `/api/sensors` | Register a sensor |
 | `PATCH` | `/api/sensors/{id}` | Name, enable or annotate a sensor (`metadata`) |
 | `GET` | `/api/actuators` | List actuators (`?deviceId=`) |
@@ -349,6 +412,7 @@ Full documentation: **<http://localhost:8080/swagger-ui.html>**
 | `PATCH` | `/api/actuators/{id}` | Rename, enable/disable, change `maxRunSeconds` (0 removes it) |
 | `POST` | `/api/actuators/{id}/commands` | **Command an actuator** → `202` |
 | `GET` | `/api/actuators/{id}/commands` | Command history |
+| `GET` | `/api/actuators/commands/{commandUid}` | One command by the `commandUid` returned when it was issued (poll until `EXECUTED` / `FAILED`) |
 | `GET` | `/captures/{date}/{file}` | Trolley photo referenced by an AI detection's `imageUrl` (authenticated; fetch with the bearer token, a plain `<img src>` cannot send it) |
 | `POST` | `/api/auth/refresh` | Exchange a refresh token for a new pair (single-use, rotated) |
 | `POST` | `/api/auth/logout` | Revoke this device's refresh token |
@@ -356,24 +420,30 @@ Full documentation: **<http://localhost:8080/swagger-ui.html>**
 | `GET` `POST` | `/api/users` | Accounts (ADMIN): list, create |
 | `PATCH` | `/api/users/{id}` | Name, role, enabled (ADMIN; self and last admin protected) |
 | `POST` | `/api/users/{id}/reset-password` | Temporary password, must be changed at next sign-in (ADMIN) |
-| `GET` | `/api/cultivation/active` | Today's HST, phase in effect (EC target, N:P:K), next phase |
-| `GET` `POST` | `/api/cultivation/cycles` | Planting cycles with growth phases |
-| `PATCH` | `/api/cultivation/cycles/{id}` | Rename, dates, status (ACTIVE / ENDED) |
-| `PUT` | `/api/cultivation/cycles/{id}/phases` | Replace the growth phases |
-| `GET` `POST` | `/api/plants` | Treatment plants (`?cycleId=&treatmentCode=&blockCode=&stationCode=`); `/batch` for many |
-| `PATCH` | `/api/plants/{id}` | Update a plant |
-| `GET` `POST` | `/api/plants/{id}/observations` | Manual observation log (height, leaves, leaf-3 size, notes + soil snapshot) |
+| `GET` | `/api/cultivation/active` | Today's HST, phase in effect (AI fuzzy phases, EC target), next phase. `404` = transplant date not set |
+| `PUT` | `/api/cultivation/transplant-date` | **The** cultivation setting: `{"transplantDate":"2026-09-12"}`. Creates or moves the hidden active cycle |
+| `GET` `POST` | `/api/plants` | Plants (`?active=true`); `POST {name, description?}`, code is made from the name |
+| `GET` `POST` | `/api/irrigation/schedules` | Daily watering times (`{time:"06:00", durationSeconds}`, WIB); the backend starts the irrigation pump at each time |
+| `PATCH` `DELETE` | `/api/irrigation/schedules/{id}` | Change time/duration, switch on/off, delete |
 | `GET` | `/api/alerts` | List alerts (`?acknowledged=&severity=&deviceId=&sensorId=&actuatorId=`, filters combine) |
 | `GET` | `/api/alerts/{id}` | One alert |
 | `PATCH` | `/api/alerts/{id}/acknowledge` | Acknowledge |
 | `GET` | `/api/ai/detections` | List detections (`?stationCode=&deviceId=&detectionType=`) |
 | `GET` | `/api/ai/detections/{id}` | One detection |
+| `GET` | `/api/ai/inputs` | Sensor snapshot for the AI service, with field names exactly as its fuzzy forms (`fertilization`, `irrigation`), HST, per-reading age; `readyForFertilization` is false when a reading is missing or older than `AI_INPUTS_MAX_AGE` (15 min, rule S9) |
 | `GET` | `/api/dashboard/overview` | **Everything the dashboard needs, in one request** |
+| `DELETE` | `/api/plants/{id}` | Delete a plant (AI detections are kept, detached). Deleting the last plant clears the transplant date |
+| `GET` | `/api/sensors/{id}/calibration-samples.csv` | Lab samples of a sensor as CSV (WIB, covariates as columns) |
+| `GET` | `/api/push/config` | Whether push is on, the VAPID public key, and this account's subscription count |
+| `POST` | `/api/push/subscriptions` | Subscribe this browser (body = `JSON.stringify(pushSubscription)`); any role |
+| `DELETE` | `/api/push/subscriptions` | Unsubscribe (`{endpoint}`); call on sign-out |
+| `POST` | `/api/push/test` | Send a test notification to the signed-in account's browsers |
 
 Development-only (`dev` profile; the routes do not exist otherwise):
 
 | Method | Path |
 |---|---|
+| `POST` | `/api/dev/seed-season?days=75` | One season of sensor history for every catalog sensor (hourly + recent raw). Safe to repeat |
 | `POST` | `/api/dev/telemetry` |
 | `POST` | `/api/dev/devices/{deviceCode}/heartbeat` |
 | `POST` | `/api/dev/devices/{deviceCode}/status` |
@@ -433,7 +503,8 @@ client.activate();
 |---|---|
 | `/topic/telemetry` | `SENSOR_READING_UPDATED` |
 | `/topic/devices` | `DEVICE_STATUS_CHANGED` |
-| `/topic/actuators` | `ACTUATOR_STATUS_CHANGED` |
+| `/topic/actuators` | `ACTUATOR_STATUS_CHANGED`, `ACTUATOR_UPDATED` (registered or settings changed) |
+| `/topic/sensors` | `SENSOR_UPDATED` (registered, auto-registered, renamed, enabled or disabled) |
 | `/topic/actuators/commands` | `ACTUATOR_COMMAND_UPDATED` |
 | `/topic/alerts` | `ALERT_CREATED`, `ALERT_UPDATED` (acknowledged) |
 | `/topic/ai` | `AI_DETECTION_CREATED` |
@@ -554,8 +625,10 @@ src/main/java/com/fertimata/backend/
 ├── alert/          alerts and acknowledgement
 ├── ai/             AI detections (single label or multi-label scores, camera stations)
 ├── catalog/        hardware catalog binding and create-only startup sync
-├── plant/          minimal plant entity
-├── automation/     rule storage + engine interface (no rules implemented)
+├── cultivation/    transplant date, HST, growth phases (AI fuzzy)
+├── plant/          plants shown on the dashboard
+├── irrigation/     daily watering schedule and its runner
+├── push/           Web Push subscriptions and alert notifications
 ├── mqtt/           MqttPublisher port, topic resolver, dispatcher, handlers, payloads, mock
 ├── websocket/      STOMP config, event model, publisher
 ├── dashboard/      one-request overview
@@ -571,14 +644,14 @@ interface. Entities are never returned from a controller.
 
 Honest list of what this phase does **not** do:
 
-1. **No automation.** `AutomationEngine` is a no-op and no agricultural threshold is hard-coded
-   anywhere. Irrigation and dosing schedules and automatic mixing live in the AI team's separate
-   service, which uses the command API above.
+1. **Watering is time-based only.** `irrigation_schedule` starts the pump at fixed times with a fixed
+   duration; no sensor condition triggers it yet. Dosing and automatic mixing live in the AI team's
+   service, which uses the command API above (`/api/ai/inputs` gives it the sensor snapshot).
 2. **No agronomic alerts.** Only infrastructure alerts (device offline, command failed) exist.
 3. **WebSocket does not scale past one instance.** The in-memory STOMP broker only reaches clients
    on the same instance; multiple instances need a broker relay.
-4. **No downsampling.** Telemetry older than the retention window is deleted, not aggregated. A
-   long-term history (seasons, not weeks) needs a downsampled table.
+4. **Old history is hourly only.** Raw readings older than the retention window are deleted; what
+   remains is the hourly rollup (min/avg/max), so sub-hour charts only cover the retention window.
 5. **Roles are coarse.** `ADMIN` / `OPERATOR` / `VIEWER` with a fixed hierarchy; no per-feature
    permissions.
 7. **No image storage.** `ai_detection.image_url` is a reference; how images are transported is
@@ -604,7 +677,7 @@ still needed, and what is in place meanwhile:
 | 7 | AI | Output contract: labels, boxes, image transport | Label is free text; extra fields kept in metadata |
 | 8 | Agronomy + AI | Whether cultivation is tracked per plant | `plant` minimal, `ai_detection.plant_id` nullable |
 | 9 | Agronomy + AI | Thresholds, irrigation/dosing schedules | AI team's separate service via the command API; engine here is a no-op |
-| 10 | Operations | Downsampling for long-term history | Time-based retention purge; no aggregation |
+| 10 | Operations | Downsampling for long-term history | Settled: retention purge plus hourly rollups kept indefinitely |
 
 When one of these is answered, the change should be configuration or a small migration — not a
 rewrite. That was the goal of this phase.

@@ -48,15 +48,6 @@ public class GrowthPhase extends AuditedEntity {
     @Column(name = "ec_target_max", precision = 6, scale = 3)
     private BigDecimal ecTargetMax;
 
-    @Column(name = "ratio_n", precision = 6, scale = 2)
-    private BigDecimal ratioN;
-
-    @Column(name = "ratio_p", precision = 6, scale = 2)
-    private BigDecimal ratioP;
-
-    @Column(name = "ratio_k", precision = 6, scale = 2)
-    private BigDecimal ratioK;
-
     @Column(length = 500)
     private String notes;
 

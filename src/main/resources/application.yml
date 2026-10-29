@@ -89,6 +89,12 @@ app:
       refuse-when-device-offline: ${ACTUATOR_REFUSE_WHEN_DEVICE_OFFLINE:false}
       # Batas waktu (expiry) buat command di kabel; edge agent bakalan buang yang udah kadaluarsa. Kalau nggak diisi berarti nggak ada field expiry-nya.
       command-ttl: ${ACTUATOR_COMMAND_TTL:}
+    # Perintah yang tidak dijawab alat dalam waktu ini ditandai gagal (NO_RESPONSE). Edge menjawab segera,
+    # patroli pun dijawab saat dimulai; ACK yang terlambat tetap mengubahnya menjadi berhasil.
+    response:
+      timeout: ${ACTUATOR_RESPONSE_TIMEOUT:2m}
+      check-interval: 30s
+      alert-window: 1h
 
   telemetry:
     auto-register-sensors: ${TELEMETRY_AUTO_REGISTER_SENSORS:true}
@@ -106,17 +112,32 @@ app:
       max-batches-per-run: ${TELEMETRY_RETENTION_MAX_BATCHES_PER_RUN:40}
       interval: ${TELEMETRY_RETENTION_INTERVAL:1h}
       initial-delay: ${TELEMETRY_RETENTION_INITIAL_DELAY:2m}
+    # Ringkasan per jam (sensor_reading_hourly) untuk grafik jangka panjang; tidak dihapus retensi.
+    # GET /api/sensors/{id}/history/aggregate membaca ringkasan ini + pembacaan mentah beberapa jam terakhir.
+    history:
+      rollup-interval: ${TELEMETRY_ROLLUP_INTERVAL:15m}
+      rollup-initial-delay: ${TELEMETRY_ROLLUP_INITIAL_DELAY:1m}
+      # Harus > rollup-interval: jam yang menerima data dalam rentang ini dihitung ulang tiap putaran.
+      rollup-lookback: ${TELEMETRY_ROLLUP_LOOKBACK:2h}
+      default-range: 7d
+      target-points: 300
+      max-points: 1000
 
   cultivation:
     # "Hari ini" untuk hitung HST (hari setelah transplant).
     zone: ${CULTIVATION_ZONE:Asia/Jakarta}
-    # Template fase untuk siklus baru. Rasio N:P:K dan EC target dari Arsitektur-Sistem.md s12.
-    # BATAS HST (start/end) MASIH PLACEHOLDER: tim agronomi belum menetapkannya. Operator bisa
-    # mengubah semua angka ini per siklus lewat PUT /api/cultivation/cycles/{id}/phases.
+    # Fase tanam MENGIKUTI FUZZY TIM AI (keputusan 29 Okt 2026: "kode yang sudah ada di AI, ikut AI"):
+    # Ai-code/app/ai/fuzzy_fertilizer FASE_MF (trapesium tumpang tindih). Batas tegas di sini = titik
+    # keanggotaan 0,5 (tengah daerah tumpang tindih) supaya aplikasi bisa menulis "Hari ke-N - fase".
+    # Target EC = inti himpunan "Optimal" EC fuzzy tingkat 2 AI (0,8 / 1,2-2,5 / 3), sama untuk semua fase.
+    # Rasio N:P:K tidak dipakai lagi: target N/P/K mutlak ada di fuzzy AI.
     default-phases:
-      - { code: VEGETATIVE, name: Vegetatif, start-hst: 0, end-hst: 24, ec-target-min: 1.5, ec-target-max: 1.8, ratio-n: 5.4, ratio-p: 1, ratio-k: 6.3 }
-      - { code: YOUNG_FRUIT, name: Buah muda, start-hst: 25, end-hst: 44, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 4.1, ratio-p: 1, ratio-k: 7.9, notes: "N turun, K naik - fase penentu Brix" }
-      - { code: FRUIT_ENLARGEMENT, name: Pembesaran buah, start-hst: 45, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 5.4, ratio-p: 1, ratio-k: 4.7 }
+      - { code: SEMAI, name: Semai, start-hst: 0, end-hst: 7, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: VEGETATIF, name: Vegetatif, start-hst: 8, end-hst: 24, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: PEMBUNGAAN, name: Pembungaan, start-hst: 25, end-hst: 34, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: PEMBUAHAN, name: Pembuahan, start-hst: 35, end-hst: 60, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: PEMATANGAN, name: Pematangan, start-hst: 61, end-hst: 74, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: PANEN, name: Panen, start-hst: 75, ec-target-min: 1.2, ec-target-max: 2.5 }
 
   calibration:
     # Nilai sensor/tegangan yang diisi otomatis (sampel lab, uji drift, kalibrasi pompa) tidak boleh lebih tua dari ini.
@@ -143,14 +164,6 @@ app:
     # Foto tidak pernah berubah setelah ditulis, jadi browser boleh menyimpannya sebentar.
     cache-max-age: ${CAPTURES_CACHE_MAX_AGE:1d}
 
-  metrics:
-    # Interval kirim telemetri untuk device tanpa entri device-intervals di katalog hardware.
-    # Dasar "pesan yang diharapkan" di /api/metrics/system.
-    expected-telemetry-interval: ${METRICS_EXPECTED_TELEMETRY_INTERVAL:30s}
-    uptime-bucket: ${METRICS_UPTIME_BUCKET:5m}
-    max-range: 92d
-    energy-metric-key: mains.energy
-
   security:
     jwt:
       # Sengaja nggak dikasih default: secret buat signing yang udah ikut di-ship sama aja artinya nggak ada authentication.
@@ -171,6 +184,61 @@ app:
     endpoint: ${WEBSOCKET_ENDPOINT:/ws}
     allowed-origins: ${WEBSOCKET_ALLOWED_ORIGINS:${FRONTEND_URL:http://localhost:3000}}
     require-authentication: ${WEBSOCKET_REQUIRE_AUTHENTICATION:true}
+
+  # Penyiraman terjadwal (keputusan 29 Okt 2026: dikerjakan backend; jam diisi lewat aplikasi).
+  # Setiap jadwal di tabel irrigation_schedule menyalakan pompa siram dengan perintah berdurasi biasa,
+  # jadi semua aturan keselamatan tetap berlaku.
+  irrigation:
+    enabled: ${IRRIGATION_SCHEDULE_ENABLED:true}
+    actuator-code: ${IRRIGATION_ACTUATOR_CODE:DIST-PUMP}
+    check-interval: 30s
+    # Jadwal yang terlewat lebih lama dari ini (backend mati) tidak dikejar.
+    grace: ${IRRIGATION_GRACE:15m}
+
+  # GET /api/ai/inputs: input fuzzy layanan AI. Nama field = form di Swagger layanan AI (Ai-code);
+  # nilai = metric key sensor backend. Ubah di sini bila tim AI mengganti arti sebuah field.
+  ai:
+    inputs:
+      # Lebih tua dari ini = basi; field-nya null dan form tidak siap (S9).
+      max-age: ${AI_INPUTS_MAX_AGE:15m}
+      fertilization:
+        ec: tank.ec
+        # "pH" tanpa keterangan di Swagger AI; dipasangkan dengan EC larutan di fuzzy tingkat 2. Konfirmasi tim AI.
+        ph: tank.ph
+        nitrogen_tanah: soil_a.nitrogen
+        phosfor_tanah: soil_a.phosphorus
+        kalium_tanah: soil_a.potassium
+      irrigation:
+        ec_air: tank.ec
+        suhu_air: tank.water_temperature
+        suhu_udara: air.temperature
+        rh: air.humidity
+        humidity_tanah: soil_a.moisture
+        temp_tanah: soil_a.temperature
+        ph: soil_a.ph
+        nitrogen: soil_a.nitrogen
+        phosfor: soil_a.phosphorus
+        kalium: soil_a.potassium
+        ec_tanah: soil_a.ec
+
+  # Notifikasi push (Web Push) ke HP untuk peringatan. Browser hanya mengizinkannya lewat HTTPS
+  # (atau http://localhost). Buat kunci sekali: npx web-push generate-vapid-keys
+  push:
+    enabled: ${PUSH_ENABLED:false}
+    vapid-public-key: ${VAPID_PUBLIC_KEY:}
+    vapid-private-key: ${VAPID_PRIVATE_KEY:}
+    # Kontak untuk server push; Apple menolak tanpa ini. mailto:... atau https://...
+    vapid-subject: ${VAPID_SUBJECT:}
+    min-severity: ${PUSH_MIN_SEVERITY:CRITICAL}
+    # Notifikasi untuk HP yang sedang mati/offline disimpan server push selama ini.
+    ttl: ${PUSH_TTL:24h}
+    request-timeout: 10s
+    # Server push Chrome/Android, Firefox, Edge dan Safari/iOS. Endpoint lain ditolak (cegah SSRF).
+    allowed-endpoint-hosts:
+      - fcm.googleapis.com
+      - push.services.mozilla.com
+      - notify.windows.com
+      - push.apple.com
 
   mqtt:
     enabled: ${MQTT_ENABLED:true}

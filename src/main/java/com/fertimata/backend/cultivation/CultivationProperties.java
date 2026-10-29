@@ -28,8 +28,5 @@ public record CultivationProperties(ZoneId zone, List<PhaseTemplate> defaultPhas
             Integer endHst,
             BigDecimal ecTargetMin,
             BigDecimal ecTargetMax,
-            BigDecimal ratioN,
-            BigDecimal ratioP,
-            BigDecimal ratioK,
             String notes) {}
 }

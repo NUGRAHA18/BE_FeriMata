@@ -158,15 +158,6 @@ public class PumpCalibrationService {
         return dispensed(actuator, start, end);
     }
 
-    /** Volume semua pompa terkalibrasi dalam rentang; dipakai metrik sistem. */
-    @Transactional(readOnly = true)
-    public List<DispensedVolumeResponse> dispensedByPumps(List<Actuator> actuators, Instant from, Instant to) {
-        return actuators.stream()
-                .filter(a -> properties.pump().covers(a.getType()))
-                .map(a -> dispensed(a, from, to))
-                .toList();
-    }
-
     private DispensedVolumeResponse dispensed(Actuator actuator, Instant from, Instant to) {
         List<ActuatorCalibration> calibrations =
                 calibrationRepository.findByActuatorIdOrderByCalibratedAtDesc(actuator.getId());

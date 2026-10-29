@@ -28,6 +28,9 @@ public final class AlertType {
     /** A device that reported backup power reports a normal supply again. */
     public static final String POWER_RESTORED = "POWER_RESTORED";
 
+    /** Jadwal siram tidak dijalankan: ditolak aturan keselamatan atau pompa tidak tersedia. */
+    public static final String IRRIGATION_SKIPPED = "IRRIGATION_SKIPPED";
+
     /** A sensor in the drift-check list has not been checked against a standard solution recently. */
     public static final String DRIFT_CHECK_DUE = "DRIFT_CHECK_DUE";
 

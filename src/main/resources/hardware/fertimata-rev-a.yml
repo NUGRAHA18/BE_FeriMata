@@ -171,7 +171,8 @@ app:
           # riwayat dan plant.plot_code = A tetap nyambung. Register dan baud bawaan belum terverifikasi.
           - { code: SOIL-A-MOISTURE, metric-key: soil_a.moisture, name: Kelembapan tanah, type: SOIL_MOISTURE, unit: "%", metadata: { modbusAddress: "1" } }
           - { code: SOIL-A-TEMP, metric-key: soil_a.temperature, name: Suhu tanah, type: SOIL_TEMPERATURE, unit: C, metadata: { modbusAddress: "1" } }
-          - { code: SOIL-A-EC, metric-key: soil_a.ec, name: EC tanah, type: SOIL_EC, unit: uS/cm, metadata: { modbusAddress: "1" } }
+          # mS/cm, satuan yang dipakai fuzzy AI; edge membagi nilai register (µS/cm) dengan 1000.
+          - { code: SOIL-A-EC, metric-key: soil_a.ec, name: EC tanah, type: SOIL_EC, unit: mS/cm, metadata: { modbusAddress: "1" } }
           - { code: SOIL-A-PH, metric-key: soil_a.ph, name: pH tanah, type: SOIL_PH, unit: pH, metadata: { modbusAddress: "1" } }
           - { code: SOIL-A-N, metric-key: soil_a.nitrogen, name: N tanah, type: SOIL_NITROGEN, unit: mg/kg, metadata: { modbusAddress: "1" } }
           - { code: SOIL-A-P, metric-key: soil_a.phosphorus, name: P tanah, type: SOIL_PHOSPHORUS, unit: mg/kg, metadata: { modbusAddress: "1" } }
@@ -209,24 +210,15 @@ app:
               modbusAddress: "21"
               channel: IN1
         actuators:
-          - { code: DOSING-N, name: Pompa dosing N (Calnit), type: DOSING_PUMP, max-run-seconds: 120, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R0 } }
-          - { code: DOSING-P, name: Pompa dosing P (MKP), type: DOSING_PUMP, max-run-seconds: 120, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R1 } }
-          - { code: DOSING-K, name: Pompa dosing K (SOP), type: DOSING_PUMP, max-run-seconds: 120, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R2 } }
+          # 150 s = batas atas keluaran fuzzy pupuk AI (durasi_n/p/k 0-150 s).
+          - { code: DOSING-N, name: Pompa dosing N (Calnit), type: DOSING_PUMP, max-run-seconds: 150, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R0 } }
+          - { code: DOSING-P, name: Pompa dosing P (MKP), type: DOSING_PUMP, max-run-seconds: 150, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R1 } }
+          - { code: DOSING-K, name: Pompa dosing K (SOP), type: DOSING_PUMP, max-run-seconds: 150, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R2 } }
           - { code: STIRRER, name: Pompa aduk drum, type: STIRRER, max-run-seconds: 600, description: "BLDC 24 V 22 W, menyala selama dosing + waktu aduk.", metadata: { modbusAddress: "21", channel: R4 } }
           - { code: EC-POWER, name: Daya papan EC, type: SENSOR_POWER, description: "Harus OFF saat membaca pH. Diurutkan oleh edge agent.", metadata: { modbusAddress: "21", channel: R5 } }
           # Campur pupuk otomatis dan jadwal siram/dosing adalah layanan terpisah tim AI (keputusan 28 Okt 2026).
           # Layanan itu memakai pompa di atas lewat POST /api/actuators/{id}/commands (ON + durationSeconds),
           # jadi interlock backend tetap berlaku. DOSING-LOOP dan metrik dosing.* dinonaktifkan di V9.
-
-  metrics:
-    # D4: interval kirim telemetri per device, salinan `polling` di config edge (§4.6). Edge mengirim satu pesan
-    # per kelompok polling, jadi device dengan beberapa kelompok mencantumkan semuanya; "pesan yang diharapkan"
-    # di /api/metrics/system adalah jumlahnya. PANEL-01 tidak mengirim telemetri (state relay lewat status).
-    device-intervals:
-      - { device: JETSON-01, intervals: [30s, 60s] }           # trolley_s, soc_s
-      - { device: PZEM-01, intervals: [3s] }                   # pzem_s
-      - { device: GREENHOUSE-01, intervals: [60s, 300s] }      # air_light_s, soil_s
-      - { device: RIO-TANK-01, intervals: [5s, 600s] }         # float (relays_s); EC, pH dan suhu larutan dalam satu pesan (tank_s)
 
   power:
     # Values the edge agent reports in the status message's powerSource field. Anything else counts as

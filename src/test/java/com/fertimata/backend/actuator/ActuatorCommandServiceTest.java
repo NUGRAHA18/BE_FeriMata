@@ -234,6 +234,38 @@ class ActuatorCommandServiceTest {
     }
 
     @Test
+    @DisplayName("a late acknowledgement still turns a timed-out command into EXECUTED")
+    void lateAcknowledgementOverridesTimeout() {
+        ActuatorCommand command = pendingCommand(CommandStatus.SENT);
+        command.markNoResponse("Alat tidak menjawab", Instant.now());
+        when(commandRepository.findByCommandUid("cmd-6")).thenReturn(Optional.of(command));
+
+        commandService.applyAcknowledgement(
+                "JETSON-001", new CommandAckPayload("cmd-6", true, "ON", Instant.now(), null));
+
+        assertThat(command.getStatus()).isEqualTo(CommandStatus.EXECUTED);
+        assertThat(command.getFailureCode()).isNull();
+        assertThat(command.getErrorMessage()).isNull();
+    }
+
+    @Test
+    @DisplayName("a late failed acknowledgement replaces NO_RESPONSE with the device's own reason")
+    void lateFailedAcknowledgementKeepsDeviceReason() {
+        ActuatorCommand command = pendingCommand(CommandStatus.SENT);
+        command.markNoResponse("Alat tidak menjawab", Instant.now());
+        when(commandRepository.findByCommandUid("cmd-7")).thenReturn(Optional.of(command));
+
+        // Edge menahan ACK di outbox selama MQTT putus; perintahnya sudah kedaluwarsa saat tiba.
+        commandService.applyAcknowledgement(
+                "JETSON-001", new CommandAckPayload("cmd-7", false, "OFF", Instant.now(), "EXPIRED: perintah sudah kedaluwarsa"));
+
+        assertThat(command.getStatus()).isEqualTo(CommandStatus.FAILED);
+        assertThat(command.getFailureCode()).isEqualTo("EXPIRED");
+        assertThat(command.getErrorMessage()).isEqualTo("EXPIRED: perintah sudah kedaluwarsa");
+        assertThat(command.isAwaitingLateAck()).isFalse();
+    }
+
+    @Test
     @DisplayName("an acknowledgement for an unknown command id is ignored, not guessed at")
     void unknownAcknowledgementIsIgnored() {
         when(commandRepository.findByCommandUid("nope")).thenReturn(Optional.empty());

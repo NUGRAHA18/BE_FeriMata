@@ -13,9 +13,6 @@ public record GrowthPhaseResponse(
         Integer endHst,
         BigDecimal ecTargetMin,
         BigDecimal ecTargetMax,
-        BigDecimal ratioN,
-        BigDecimal ratioP,
-        BigDecimal ratioK,
         String notes) {
 
     public static GrowthPhaseResponse from(GrowthPhase phase) {
@@ -27,9 +24,6 @@ public record GrowthPhaseResponse(
                 phase.getEndHst(),
                 phase.getEcTargetMin(),
                 phase.getEcTargetMax(),
-                phase.getRatioN(),
-                phase.getRatioP(),
-                phase.getRatioK(),
                 phase.getNotes());
     }
 }

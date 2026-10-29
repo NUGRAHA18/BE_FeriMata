@@ -7,6 +7,7 @@ import com.fertimata.backend.ai.AiDetectionService;
 import com.fertimata.backend.alert.AlertResponse;
 import com.fertimata.backend.alert.AlertService;
 import com.fertimata.backend.alert.AlertSeverity;
+import com.fertimata.backend.common.util.JsonSupport;
 import com.fertimata.backend.config.AppProperties;
 import com.fertimata.backend.cultivation.CultivationService;
 import com.fertimata.backend.device.DeviceRepository;
@@ -18,6 +19,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,7 @@ public class DashboardService {
     private final AiDetectionService aiDetectionService;
     private final CultivationService cultivationService;
     private final AppProperties appProperties;
+    private final JsonSupport jsonSupport;
 
     public DashboardService(
             DeviceService deviceService,
@@ -54,7 +57,8 @@ public class DashboardService {
             AlertService alertService,
             AiDetectionService aiDetectionService,
             CultivationService cultivationService,
-            AppProperties appProperties) {
+            AppProperties appProperties,
+            JsonSupport jsonSupport) {
         this.deviceService = deviceService;
         this.deviceRepository = deviceRepository;
         this.sensorService = sensorService;
@@ -64,6 +68,7 @@ public class DashboardService {
         this.aiDetectionService = aiDetectionService;
         this.cultivationService = cultivationService;
         this.appProperties = appProperties;
+        this.jsonSupport = jsonSupport;
     }
 
     @Transactional(readOnly = true)
@@ -118,8 +123,7 @@ public class DashboardService {
                         s.currentPhase(),
                         s.nextPhase(),
                         s.daysUntilNextPhase(),
-                        s.plantCount(),
-                        s.treatmentPlantCount()))
+                        s.plantCount()))
                 .orElse(null);
     }
 
@@ -129,6 +133,16 @@ public class DashboardService {
      * <p>Two sources are enough to answer "what just happened here?" without turning the dashboard
      * into an audit log; the dedicated endpoints stay the place to dig further.
      */
+    /**
+     * Kode alasan peringatan, supaya klien tidak mencocokkan teks pesan: metadata.failureCode (perintah
+     * gagal, mis. NO_RESPONSE) atau metadata.reasonCode (jadwal siram dibatalkan, mis. BACKUP_POWER).
+     */
+    private String failureCode(AlertResponse alert) {
+        Map<String, Object> metadata = jsonSupport.toMap(alert.metadata());
+        Object code = metadata.containsKey("failureCode") ? metadata.get("failureCode") : metadata.get("reasonCode");
+        return code == null ? null : code.toString();
+    }
+
     private List<DashboardOverviewResponse.ActivityEntry> recentActivity(List<AlertResponse> activeAlerts) {
         List<DashboardOverviewResponse.ActivityEntry> entries = new ArrayList<>();
 
@@ -145,7 +159,9 @@ public class DashboardService {
                     command.actuatorCode(),
                     command.deviceCode(),
                     actor,
-                    command.id()));
+                    command.id(),
+                    command.failureCode(),
+                    null));
         }
 
         for (AlertResponse alert : activeAlerts) {
@@ -159,7 +175,9 @@ public class DashboardService {
                     alert.relatedActuatorCode(),
                     alert.relatedDeviceCode(),
                     alert.source().name(),
-                    alert.id()));
+                    alert.id(),
+                    failureCode(alert),
+                    alert.type()));
         }
 
         return entries.stream()

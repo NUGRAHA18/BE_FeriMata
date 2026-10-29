@@ -102,12 +102,31 @@ public class ActuatorCommand extends AuditedEntity {
     public void markExecuted(Instant at) {
         this.status = CommandStatus.EXECUTED;
         this.executedAt = at;
+        // ACK terlambat setelah batas waktu: hapus jejak "tidak menjawab".
+        this.errorMessage = null;
+        this.failureCode = null;
     }
 
     public void markFailed(String reason, Instant at) {
         this.status = CommandStatus.FAILED;
         this.errorMessage = truncate(reason);
         this.executedAt = at;
+    }
+
+    /** Kode {@link #failureCode} untuk perintah yang tidak dijawab alat dalam batas waktu. */
+    public static final String NO_RESPONSE = "NO_RESPONSE";
+
+    /**
+     * Alat tidak menjawab. Bukan bukti perintah gagal dijalankan, hanya bahwa backend berhenti menunggu;
+     * ACK yang datang terlambat tetap boleh menimpanya (lihat {@link #isAwaitingLateAck()}).
+     */
+    public void markNoResponse(String text, Instant at) {
+        markFailed(text, at);
+        this.failureCode = NO_RESPONSE;
+    }
+
+    public boolean isAwaitingLateAck() {
+        return status == CommandStatus.FAILED && NO_RESPONSE.equals(failureCode);
     }
 
     /** Records a failure the device reported, keeping its message whole and its code separately. */

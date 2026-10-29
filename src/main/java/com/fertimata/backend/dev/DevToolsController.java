@@ -13,6 +13,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,11 +24,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -44,6 +48,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("dev")
 @Tag(name = "Development tools", description = "DEVELOPMENT ONLY. Inject messages and inspect the mock broker.")
 @SecurityRequirement(name = "bearerAuth")
+@Validated
 public class DevToolsController {
 
     private static final Logger log = LoggerFactory.getLogger(DevToolsController.class);
@@ -53,18 +58,32 @@ public class DevToolsController {
     private final MqttTopicResolver topicResolver;
     private final JsonSupport jsonSupport;
     private final ObjectProvider<LoopbackMqttPublisher> loopbackPublisher;
+    private final DevSeasonSeeder seasonSeeder;
 
     public DevToolsController(
             TelemetryIngestService ingestService,
             MqttInboundDispatcher dispatcher,
             MqttTopicResolver topicResolver,
             JsonSupport jsonSupport,
-            ObjectProvider<LoopbackMqttPublisher> loopbackPublisher) {
+            ObjectProvider<LoopbackMqttPublisher> loopbackPublisher,
+            DevSeasonSeeder seasonSeeder) {
         this.ingestService = ingestService;
         this.dispatcher = dispatcher;
         this.topicResolver = topicResolver;
         this.jsonSupport = jsonSupport;
         this.loopbackPublisher = loopbackPublisher;
+        this.seasonSeeder = seasonSeeder;
+    }
+
+    @PostMapping("/seed-season")
+    @Operation(
+            summary = "Fill the database with one growing season of sensor history",
+            description = "For every catalog sensor: hourly rollups for old days and raw readings every 5 minutes "
+                    + "for the last days. Planting cycles and plants are left to the operator. Safe to repeat: "
+                    + "existing data is never overwritten.")
+    public DevSeasonSeeder.Result seedSeason(@RequestParam(defaultValue = "75") @Min(7) @Max(120) int days) {
+        log.info("[DEV] Seeding an example season of {} day(s)", days);
+        return seasonSeeder.seed(days);
     }
 
     @PostMapping("/telemetry")

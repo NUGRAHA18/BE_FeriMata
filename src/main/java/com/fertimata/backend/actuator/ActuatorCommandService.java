@@ -188,7 +188,10 @@ public class ActuatorCommandService {
         }
 
         ActuatorCommand command = found.get();
-        if (command.getStatus().isTerminal()) {
+        if (command.isAwaitingLateAck()) {
+            // Backend sudah berhenti menunggu, tapi jawaban alat tetap fakta yang lebih kuat.
+            log.info("Late acknowledgement for command {} from {} after the response timeout", ack.commandUid(), deviceCode);
+        } else if (command.getStatus().isTerminal()) {
             log.debug("Ignoring repeated acknowledgement for command {}", ack.commandUid());
             return;
         }
@@ -262,6 +265,14 @@ public class ActuatorCommandService {
 
     public boolean transportAvailable() {
         return transport.isAvailable();
+    }
+
+    /** Status satu perintah lewat commandUid; dipakai layanan AI untuk menunggu tiap langkah urutan pupuk. */
+    @Transactional(readOnly = true)
+    public ActuatorCommandResponse byUid(String commandUid) {
+        return commandRepository.findByCommandUid(commandUid)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Actuator command", commandUid));
     }
 
     private ActuatorCommandResponse toResponse(ActuatorCommand command) {

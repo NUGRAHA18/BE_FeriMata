@@ -22,6 +22,36 @@ app:
     allowed-origins: http://localhost:3000
     require-authentication: true
 
+  actuator:
+    response:
+      timeout: 2m
+      check-interval: 1h
+      alert-window: 1h
+
+  irrigation:
+    enabled: true
+    actuator-code: IT-PUMP
+    # Tests call IrrigationScheduleRunner.runDue themselves.
+    check-interval: 1h
+    grace: 15m
+
+  ai:
+    inputs:
+      max-age: 15m
+      fertilization:
+        ec: tank.ec
+        ph: tank.ph
+      irrigation:
+        suhu_udara: air.temperature
+
+  push:
+    enabled: false
+    min-severity: CRITICAL
+    ttl: 24h
+    request-timeout: 10s
+    allowed-endpoint-hosts:
+      - fcm.googleapis.com
+
   device:
     offline-timeout: 120s
     # Effectively disabled: the scheduler must not interfere with assertions.
@@ -41,6 +71,14 @@ app:
       max-batches-per-run: 10
       interval: 1h
       initial-delay: 1h
+    history:
+      # Tests call SensorReadingRollupJob.runOnce themselves.
+      rollup-interval: 1h
+      rollup-initial-delay: 1h
+      rollup-lookback: 2h
+      default-range: 7d
+      target-points: 300
+      max-points: 1000
 
   mqtt:
     # The loopback transport, so the tests need no broker.
@@ -60,9 +98,13 @@ app:
   cultivation:
     zone: Asia/Jakarta
     default-phases:
-      - { code: VEGETATIVE, name: Vegetatif, start-hst: 0, end-hst: 24, ec-target-min: 1.5, ec-target-max: 1.8, ratio-n: 5.4, ratio-p: 1, ratio-k: 6.3 }
-      - { code: YOUNG_FRUIT, name: Buah muda, start-hst: 25, end-hst: 44, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 4.1, ratio-p: 1, ratio-k: 7.9 }
-      - { code: FRUIT_ENLARGEMENT, name: Pembesaran buah, start-hst: 45, ec-target-min: 1.8, ec-target-max: 2.0, ratio-n: 5.4, ratio-p: 1, ratio-k: 4.7 }
+      # Sama dengan application.yml: FASE_MF fuzzy AI.
+      - { code: SEMAI, name: Semai, start-hst: 0, end-hst: 7, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: VEGETATIF, name: Vegetatif, start-hst: 8, end-hst: 24, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: PEMBUNGAAN, name: Pembungaan, start-hst: 25, end-hst: 34, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: PEMBUAHAN, name: Pembuahan, start-hst: 35, end-hst: 60, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: PEMATANGAN, name: Pematangan, start-hst: 61, end-hst: 74, ec-target-min: 1.2, ec-target-max: 2.5 }
+      - { code: PANEN, name: Panen, start-hst: 75, ec-target-min: 1.2, ec-target-max: 2.5 }
 
 spring:
   jpa:

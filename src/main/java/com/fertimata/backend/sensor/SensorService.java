@@ -11,6 +11,8 @@ import com.fertimata.backend.device.DeviceService;
 import com.fertimata.backend.telemetry.domain.SensorReading;
 import com.fertimata.backend.telemetry.domain.SensorReadingRepository;
 import com.fertimata.backend.telemetry.dto.SensorReadingResponse;
+import com.fertimata.backend.websocket.RealtimeEventPublisher;
+import com.fertimata.backend.websocket.RealtimeEventType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,7 @@ public class SensorService {
     private final TelemetryProperties telemetryProperties;
     private final JsonSupport jsonSupport;
     private final ReadingCalibrator readingCalibrator;
+    private final RealtimeEventPublisher realtimeEventPublisher;
 
     public SensorService(
             SensorRepository sensorRepository,
@@ -46,13 +49,15 @@ public class SensorService {
             DeviceService deviceService,
             TelemetryProperties telemetryProperties,
             JsonSupport jsonSupport,
-            ReadingCalibrator readingCalibrator) {
+            ReadingCalibrator readingCalibrator,
+            RealtimeEventPublisher realtimeEventPublisher) {
         this.sensorRepository = sensorRepository;
         this.sensorReadingRepository = sensorReadingRepository;
         this.deviceService = deviceService;
         this.telemetryProperties = telemetryProperties;
         this.jsonSupport = jsonSupport;
         this.readingCalibrator = readingCalibrator;
+        this.realtimeEventPublisher = realtimeEventPublisher;
     }
 
     @Transactional(readOnly = true)
@@ -102,7 +107,7 @@ public class SensorService {
         Sensor saved = sensorRepository.save(sensor);
         log.info("Sensor registered: {} ({}) on device {}", saved.getCode(), saved.getMetricKey(),
                 device.getDeviceCode());
-        return SensorResponse.from(saved);
+        return publishUpdated(saved);
     }
 
     @Transactional
@@ -130,7 +135,7 @@ public class SensorService {
                 sensor.setAutoRegistered(false);
             }
         }
-        return SensorResponse.from(sensor);
+        return publishUpdated(sensor);
     }
 
     /**
@@ -164,6 +169,8 @@ public class SensorService {
         sensor.setDescription("Auto-registered from telemetry; review name, type and unit before enabling");
         Sensor saved = sensorRepository.save(sensor);
         log.info("Auto-registered sensor for unknown metric {} on device {}", metricKey, device.getDeviceCode());
+        // Muncul di daftar sensor admin sebagai baris yang perlu ditinjau, meski belum di dashboard.
+        publishUpdated(saved);
         return Optional.of(saved);
     }
 
@@ -205,6 +212,13 @@ public class SensorService {
     @Transactional(readOnly = true)
     public long countAll() {
         return sensorRepository.count();
+    }
+
+    /** Operator lain yang sedang membuka dashboard langsung melihat perubahan tanpa reload. */
+    private SensorResponse publishUpdated(Sensor sensor) {
+        SensorResponse response = SensorResponse.from(sensor);
+        realtimeEventPublisher.publish(RealtimeEventType.SENSOR_UPDATED, response);
+        return response;
     }
 
     /** Exposed for the ingestion pipeline, which already holds a managed reading. */

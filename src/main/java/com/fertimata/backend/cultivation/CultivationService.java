@@ -1,13 +1,9 @@
 package com.fertimata.backend.cultivation;
 
 import com.fertimata.backend.common.exception.BusinessRuleException;
-import com.fertimata.backend.common.exception.ResourceNotFoundException;
 import com.fertimata.backend.cultivation.dto.CycleStatusResponse;
-import com.fertimata.backend.cultivation.dto.GrowthPhaseRequest;
 import com.fertimata.backend.cultivation.dto.GrowthPhaseResponse;
-import com.fertimata.backend.cultivation.dto.PlantingCycleRequest;
 import com.fertimata.backend.cultivation.dto.PlantingCycleResponse;
-import com.fertimata.backend.cultivation.dto.PlantingCycleUpdateRequest;
 import com.fertimata.backend.plant.PlantRepository;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -23,10 +19,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Siklus tanam, fase pertumbuhan, dan jawaban "hari ini HST berapa, fase apa".
+ * Jawaban "hari ini HST berapa, fase apa", dihitung dari satu tanggal tanam pindah.
  *
- * <p>Backend hanya menghitung umur dan mencocokkan fase. Angka agronomi (batas HST, EC, rasio) datang
- * dari operator atau template konfigurasi dan tidak pernah dinilai di sini.
+ * <p>Siklus tanam tidak lagi terlihat di aplikasi (29 Okt 2026): satu siklus ACTIVE hanya menyimpan
+ * tanggal tanam pindah dan daftar fase (template {@code app.cultivation.default-phases}, mengikuti
+ * fuzzy tim AI). Operator hanya mengubah tanggalnya lewat {@link #setTransplantDate}.
  */
 @Service
 public class CultivationService {
@@ -50,57 +47,14 @@ public class CultivationService {
     }
 
     @Transactional(readOnly = true)
-    public List<PlantingCycleResponse> list() {
-        return cycleRepository.findAllByOrderByTransplantDateDesc().stream()
-                .map(PlantingCycleResponse::from)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public PlantingCycleResponse get(Long id) {
-        return PlantingCycleResponse.from(require(id));
-    }
-
-    @Transactional(readOnly = true)
-    public PlantingCycle require(Long id) {
-        return cycleRepository.findWithPhasesById(id).orElseThrow(() -> new ResourceNotFoundException("PlantingCycle", id));
-    }
-
-    @Transactional(readOnly = true)
     public Optional<PlantingCycle> activeCycle() {
         return cycleRepository.findFirstByStatus(CycleStatus.ACTIVE);
     }
 
-    /** Keadaan siklus aktif hari ini; kosong bila belum ada siklus aktif. */
+    /** Keadaan hari ini; kosong bila tanggal tanam pindah belum diisi. */
     @Transactional(readOnly = true)
     public Optional<CycleStatusResponse> activeStatus() {
         return activeCycle().map(this::status);
-    }
-
-    @Transactional(readOnly = true)
-    public CycleStatusResponse status(Long cycleId) {
-        return status(require(cycleId));
-    }
-
-    private CycleStatusResponse status(PlantingCycle cycle) {
-        LocalDate today = LocalDate.now(clock.withZone(properties.zone()));
-        long hst = cycle.hstOn(today);
-        Optional<GrowthPhase> current = cycle.phaseAt(hst);
-        Optional<GrowthPhase> next = cycle.nextPhaseAfter(hst);
-        return new CycleStatusResponse(
-                PlantingCycleResponse.from(cycle),
-                today,
-                hst,
-                current.map(GrowthPhaseResponse::from).orElse(null),
-                next.map(GrowthPhaseResponse::from).orElse(null),
-                next.map(p -> p.getStartHst() - hst).orElse(null),
-                plantRepository.countByCycleIdAndActiveTrue(cycle.getId()),
-                plantRepository.countByCycleIdAndActiveTrueAndTreatmentCodeIsNotNull(cycle.getId()));
-    }
-
-    /** HST hari ini untuk siklus tertentu, dipakai saat mencatat pengamatan. */
-    public long hstToday(PlantingCycle cycle) {
-        return cycle.hstOn(today());
     }
 
     /** Tanggal hari ini di zona greenhouse. */
@@ -112,100 +66,57 @@ public class CultivationService {
         return properties.zone();
     }
 
+    /**
+     * Satu-satunya pengaturan budidaya di aplikasi: tanggal tanam pindah greenhouse. Memperbarui siklus
+     * aktif, atau membuatnya (dengan template fase bawaan) bila belum ada.
+     */
     @Transactional
-    public PlantingCycleResponse create(PlantingCycleRequest request) {
-        if (cycleRepository.existsByCode(request.code())) {
-            throw new BusinessRuleException(
-                    "A planting cycle with code %s already exists".formatted(request.code()),
-                    Map.of("code", request.code()));
-        }
-        PlantingCycle cycle = new PlantingCycle(request.code(), request.name(), request.transplantDate());
-        cycle.setVariety(request.variety());
-        cycle.setExpectedHarvestDate(request.expectedHarvestDate());
-        cycle.setNotes(request.notes());
-
-        List<GrowthPhase> phases = request.phases() == null || request.phases().isEmpty()
-                ? defaultPhases()
-                : toPhases(request.phases());
-        cycle.replacePhases(validatePhases(phases));
-
-        boolean activate = request.activate() == null || request.activate();
-        if (activate) {
-            endCurrentActive();
-            cycle.setStatus(CycleStatus.ACTIVE);
-        } else {
-            cycle.setStatus(CycleStatus.PLANNED);
-        }
-
-        PlantingCycle saved = cycleRepository.save(cycle);
-        log.info(
-                "Planting cycle {} created (transplant {}, {} phase(s), status {})",
-                saved.getCode(),
-                saved.getTransplantDate(),
-                saved.getPhases().size(),
-                saved.getStatus());
-        return PlantingCycleResponse.from(saved);
-    }
-
-    @Transactional
-    public PlantingCycleResponse update(Long id, PlantingCycleUpdateRequest request) {
-        PlantingCycle cycle = require(id);
-        if (request.name() != null) {
-            cycle.setName(request.name());
-        }
-        if (request.variety() != null) {
-            cycle.setVariety(request.variety());
-        }
-        if (request.transplantDate() != null) {
-            cycle.setTransplantDate(request.transplantDate());
-        }
-        if (request.expectedHarvestDate() != null) {
-            cycle.setExpectedHarvestDate(request.expectedHarvestDate());
-        }
-        if (request.notes() != null) {
-            cycle.setNotes(request.notes());
-        }
-        if (request.status() != null && request.status() != cycle.getStatus()) {
-            changeStatus(cycle, request.status());
-        }
-        return PlantingCycleResponse.from(cycle);
-    }
-
-    /** Mengganti seluruh daftar fase siklus; fase lama yang tidak ada lagi dihapus. */
-    @Transactional
-    public PlantingCycleResponse replacePhases(Long id, List<GrowthPhaseRequest> requests) {
-        PlantingCycle cycle = require(id);
-        List<GrowthPhase> phases = validatePhases(toPhases(requests));
-        cycle.replacePhases(phases);
-        log.info("Planting cycle {} now has {} phase(s)", cycle.getCode(), phases.size());
-        return PlantingCycleResponse.from(cycle);
-    }
-
-    private void changeStatus(PlantingCycle cycle, CycleStatus target) {
-        switch (target) {
-            case ACTIVE -> {
-                endCurrentActive();
-                cycle.setStatus(CycleStatus.ACTIVE);
-                cycle.setEndedAt(null);
+    public CycleStatusResponse setTransplantDate(LocalDate transplantDate) {
+        PlantingCycle cycle = activeCycle().orElseGet(() -> {
+            String code = "MT-" + transplantDate;
+            int n = 2;
+            while (cycleRepository.existsByCode(code)) {
+                code = "MT-" + transplantDate + "-" + n++;
             }
-            case ENDED -> {
-                cycle.setStatus(CycleStatus.ENDED);
-                cycle.setEndedAt(LocalDate.now(clock.withZone(properties.zone())));
-            }
-            case PLANNED -> {
-                cycle.setStatus(CycleStatus.PLANNED);
-                cycle.setEndedAt(null);
-            }
-        }
-        log.info("Planting cycle {} is now {}", cycle.getCode(), cycle.getStatus());
-    }
-
-    private void endCurrentActive() {
-        cycleRepository.findFirstByStatus(CycleStatus.ACTIVE).ifPresent(active -> {
-            active.setStatus(CycleStatus.ENDED);
-            active.setEndedAt(LocalDate.now(clock.withZone(properties.zone())));
-            log.info("Planting cycle {} ended because another cycle was activated", active.getCode());
+            PlantingCycle created = new PlantingCycle(code, "Musim tanam " + transplantDate, transplantDate);
+            created.replacePhases(validatePhases(defaultPhases()));
+            created.setStatus(CycleStatus.ACTIVE);
+            return cycleRepository.save(created);
         });
+        cycle.setTransplantDate(transplantDate);
+        log.info("Transplant date set to {} (cycle {})", transplantDate, cycle.getCode());
+        return status(cycle);
+    }
+
+    /**
+     * Mengosongkan tanggal tanam: siklus aktif ditandai selesai (riwayatnya tetap ada). Dipanggil saat
+     * tanaman terakhir dihapus, supaya musim berikutnya dimulai lagi dari "Tambah tanaman pertama".
+     *
+     * @return true bila ada tanggal tanam yang dikosongkan
+     */
+    @Transactional
+    public boolean resetTransplantDate() {
+        return activeCycle().map(cycle -> {
+            cycle.setStatus(CycleStatus.ENDED);
+            cycle.setEndedAt(today());
+            log.info("Transplant date {} cleared (cycle {} ended)", cycle.getTransplantDate(), cycle.getCode());
+            return true;
+        }).orElse(false);
+    }
+
+    private CycleStatusResponse status(PlantingCycle cycle) {
+        LocalDate today = today();
+        long hst = cycle.hstOn(today);
+        Optional<GrowthPhase> current = cycle.phaseAt(hst);
+        Optional<GrowthPhase> next = cycle.nextPhaseAfter(hst);
+        return new CycleStatusResponse(
+                PlantingCycleResponse.from(cycle),
+                today,
+                hst,
+                current.map(GrowthPhaseResponse::from).orElse(null),
+                next.map(GrowthPhaseResponse::from).orElse(null),
+                next.map(p -> p.getStartHst() - hst).orElse(null),
+                plantRepository.countByActiveTrue());
     }
 
     private List<GrowthPhase> defaultPhases() {
@@ -218,37 +129,15 @@ public class CultivationService {
             phase.setEndHst(t.endHst());
             phase.setEcTargetMin(t.ecTargetMin());
             phase.setEcTargetMax(t.ecTargetMax());
-            phase.setRatioN(t.ratioN());
-            phase.setRatioP(t.ratioP());
-            phase.setRatioK(t.ratioK());
             phase.setNotes(t.notes());
             phases.add(phase);
         }
         return phases;
     }
 
-    private static List<GrowthPhase> toPhases(List<GrowthPhaseRequest> requests) {
-        List<GrowthPhase> phases = new ArrayList<>();
-        for (GrowthPhaseRequest r : requests) {
-            GrowthPhase phase = new GrowthPhase();
-            phase.setCode(r.code().trim().toUpperCase());
-            phase.setName(r.name().trim());
-            phase.setStartHst(r.startHst());
-            phase.setEndHst(r.endHst());
-            phase.setEcTargetMin(r.ecTargetMin());
-            phase.setEcTargetMax(r.ecTargetMax());
-            phase.setRatioN(r.ratioN());
-            phase.setRatioP(r.ratioP());
-            phase.setRatioK(r.ratioK());
-            phase.setNotes(r.notes());
-            phases.add(phase);
-        }
-        return phases;
-    }
-
     /**
-     * Fase harus punya kode unik, rentang HST valid, dan tidak saling tumpang tindih. Celah di
-     * antara fase diizinkan (HST tanpa fase hanya berarti "tidak ada target").
+     * Fase harus punya kode unik, rentang HST valid, dan tidak saling tumpang tindih. Menjaga template di
+     * konfigurasi tetap masuk akal.
      *
      * @return salinan yang terurut menurut HST awal; masukan tidak diubah
      */

@@ -1,7 +1,5 @@
 package com.fertimata.backend.telemetry;
 
-import com.fertimata.backend.automation.AutomationEngine;
-import com.fertimata.backend.automation.AutomationSignal;
 import com.fertimata.backend.common.exception.TelemetryValidationException;
 import com.fertimata.backend.common.util.JsonSupport;
 import com.fertimata.backend.config.TelemetryProperties;
@@ -53,7 +51,6 @@ public class TelemetryIngestService {
     private final DeviceService deviceService;
     private final SensorService sensorService;
     private final RealtimeEventPublisher realtimeEventPublisher;
-    private final AutomationEngine automationEngine;
     private final TelemetryProperties telemetryProperties;
     private final JsonSupport jsonSupport;
 
@@ -63,7 +60,6 @@ public class TelemetryIngestService {
             DeviceService deviceService,
             SensorService sensorService,
             RealtimeEventPublisher realtimeEventPublisher,
-            AutomationEngine automationEngine,
             TelemetryProperties telemetryProperties,
             JsonSupport jsonSupport) {
         this.telemetryMessageRepository = telemetryMessageRepository;
@@ -71,7 +67,6 @@ public class TelemetryIngestService {
         this.deviceService = deviceService;
         this.sensorService = sensorService;
         this.realtimeEventPublisher = realtimeEventPublisher;
-        this.automationEngine = automationEngine;
         this.telemetryProperties = telemetryProperties;
         this.jsonSupport = jsonSupport;
     }
@@ -147,14 +142,24 @@ public class TelemetryIngestService {
 
         deviceService.recordContact(resolvedDevice, recordedAt, null);
         publishUpdate(resolvedDevice, recordedAt, savedReadings);
-        savedReadings.forEach(this::notifyAutomation);
 
-        log.info(
-                "Telemetry ingested from {} via {}: {} reading(s) stored, {} rejected",
-                deviceCode,
-                source,
-                savedReadings.size(),
-                rejectedMetrics.size());
+        // Pesan normal hanya DEBUG: PZEM saja mengirim tiap 3 detik di Jetson, dan satu baris INFO per pesan
+        // (puluhan ribu per hari) mendorong log penting keluar dari batas rotasi Docker dalam hitungan hari.
+        if (rejectedMetrics.isEmpty()) {
+            log.debug(
+                    "Telemetry ingested from {} via {}: {} reading(s) stored",
+                    deviceCode,
+                    source,
+                    savedReadings.size());
+        } else {
+            log.info(
+                    "Telemetry ingested from {} via {}: {} reading(s) stored, {} rejected {}",
+                    deviceCode,
+                    source,
+                    savedReadings.size(),
+                    rejectedMetrics.size(),
+                    rejectedMetrics);
+        }
 
         return new TelemetryIngestResult(
                 savedMessage.getId(),
@@ -248,16 +253,6 @@ public class TelemetryIngestService {
         realtimeEventPublisher.publish(
                 RealtimeEventType.SENSOR_READING_UPDATED,
                 new TelemetryUpdate(device.getId(), device.getDeviceCode(), recordedAt, payload));
-    }
-
-    private void notifyAutomation(SensorReading reading) {
-        automationEngine.evaluate(new AutomationSignal(
-                reading.getDevice().getId(),
-                reading.getDevice().getDeviceCode(),
-                reading.getSensor().getId(),
-                reading.getMetricKey(),
-                reading.getNumericValue(),
-                reading.getRecordedAt()));
     }
 
     /**

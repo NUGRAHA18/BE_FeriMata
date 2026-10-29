@@ -1,0 +1,5512 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FertiMata Backend API",
+    "description": "Backend for the FertiMata smart-agriculture platform.\n\nThe backend is the application layer between the operator PWA and the IoT\ninfrastructure. Clients use REST for queries and commands, and the STOMP\nWebSocket endpoint for realtime updates. Clients never talk to MQTT and never\nsee hardware details.\n\n**Realtime (STOMP over WebSocket at `/ws`).** Send the access token in the STOMP\nCONNECT frame (`Authorization: Bearer <token>`). Every event is\n`{event, timestamp, data}` and is also published on `/topic/events`:\n\n| event | topic | data |\n|---|---|---|\n| SENSOR_READING_UPDATED | /topic/telemetry | device + readings of one message |\n| DEVICE_STATUS_CHANGED | /topic/devices | DeviceStatus |\n| ACTUATOR_STATUS_CHANGED | /topic/actuators | ActuatorStatus |\n| ACTUATOR_UPDATED | /topic/actuators | Actuator (settings changed) |\n| ACTUATOR_COMMAND_UPDATED | /topic/actuators/commands | ActuatorCommand |\n| SENSOR_UPDATED | /topic/sensors | Sensor (registered, renamed, enabled/disabled) |\n| ALERT_CREATED, ALERT_UPDATED | /topic/alerts | Alert |\n| AI_DETECTION_CREATED | /topic/ai | AiDetection |\n\nRunning in DEVELOPMENT mode.\n",
+    "contact": {
+      "name": "FertiMata team"
+    },
+    "license": {
+      "name": "Internal project"
+    },
+    "version": "0.2.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Laptop (docker compose dev)"
+    },
+    {
+      "url": "http://{host}",
+      "description": "Jetson lewat Caddy (same-origin)",
+      "variables": {
+        "host": {
+          "default": "192.168.1.105"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Push notifications",
+      "description": "Web Push subscriptions for alert notifications"
+    },
+    {
+      "name": "Actuators",
+      "description": "Controllable outputs and their command history"
+    },
+    {
+      "name": "Authentication",
+      "description": "Sign-in, session refresh, password change"
+    },
+    {
+      "name": "Cultivation",
+      "description": "Transplant date, days after transplant (HST) and growth phase"
+    },
+    {
+      "name": "Dashboard",
+      "description": "Aggregated view for the operator console"
+    },
+    {
+      "name": "Users",
+      "description": "Account management (ADMIN only)"
+    },
+    {
+      "name": "Devices",
+      "description": "Edge device registry and liveness"
+    },
+    {
+      "name": "Sensors",
+      "description": "Measurement channels and their readings"
+    },
+    {
+      "name": "Sensor calibration",
+      "description": "Lab calibration, paired lab samples and drift checks (Protokol-Data.md §7)"
+    },
+    {
+      "name": "Pump calibration",
+      "description": "Peristaltic pump flow and dispensed volume (Protokol-Data.md §6, §8)"
+    },
+    {
+      "name": "AI detections",
+      "description": "Results produced by the vision model on the edge device"
+    },
+    {
+      "name": "Alerts",
+      "description": "Operational alerts and acknowledgement"
+    },
+    {
+      "name": "Irrigation schedule",
+      "description": "Daily watering times; the backend starts the irrigation pump at each time"
+    },
+    {
+      "name": "Plants",
+      "description": "Plants shown on the dashboard"
+    },
+    {
+      "name": "Development tools",
+      "description": "DEVELOPMENT ONLY. Inject messages and inspect the mock broker."
+    }
+  ],
+  "paths": {
+    "/captures/{date}/{file}": {
+      "get": {
+        "tags": [
+          "Captures"
+        ],
+        "summary": "Download a patrol photo",
+        "description": "Read-only file from the edge agent's photo folder (CAPTURES_DIR), e.g. /captures/2026-10-22/20261022-1905_S03_timur.png. Same Bearer token as the API, so a browser must fetch it and show the blob; a plain <img src> gets 401. 404 when CAPTURES_DIR is not set or the file does not exist.",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "path",
+            "description": "Capture day, yyyy-MM-dd",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "2026-10-22"
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "description": "File name of the photo",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "20261022-1905_S03_timur.png"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "No such photo"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/actuator/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Backend health",
+        "description": "Public. {\"status\":\"UP\"} when the backend and its database are reachable.",
+        "responses": {
+          "200": {
+            "description": "Up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Down"
+          }
+        }
+      }
+    },
+    "/api/cultivation/transplant-date": {
+      "put": {
+        "tags": [
+          "Cultivation"
+        ],
+        "summary": "Set the greenhouse transplant date",
+        "description": "The only cultivation setting in the app: HST and the growth phase on the dashboard are counted from this date.",
+        "operationId": "setTransplantDate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransplantDateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "List accounts",
+        "operationId": "list",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/User"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Create an account",
+        "description": "The new user is asked to change the password at first sign-in unless mustChangePassword is false.",
+        "operationId": "create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/{id}/reset-password": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Set a temporary password",
+        "description": "Revokes every session of the account; the user must change it at next sign-in.",
+        "operationId": "resetPassword",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors": {
+      "get": {
+        "tags": [
+          "Sensors"
+        ],
+        "summary": "List sensors",
+        "description": "Optionally filtered to a single device. Disabled sensors (not installed, retired, or auto-registered and not yet reviewed) are left out unless includeDisabled=true, which the settings screen uses to review and enable them.",
+        "operationId": "list_1",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "includeDisabled",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Sensor"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Sensors"
+        ],
+        "summary": "Register a sensor",
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SensorRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sensor"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{sensorId}/drift-checks": {
+      "get": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Drift checks of a sensor, newest first",
+        "operationId": "driftChecks",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Record a drift check against a standard solution",
+        "description": "measuredValue defaults to the sensor's latest reading.",
+        "operationId": "addDriftCheck",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DriftCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DriftCheck"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{sensorId}/calibrations": {
+      "get": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Calibration models of a sensor, newest validFrom first",
+        "operationId": "calibrations",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SensorCalibration"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Enter a calibration model computed elsewhere",
+        "description": "calibrated = intercept + slope x raw + Σ coef x covariate. Missing fit statistics are computed from the stored lab samples.",
+        "operationId": "create_1",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SensorCalibrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensorCalibration"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{sensorId}/calibrations/fit": {
+      "post": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Fit a calibration model from the lab samples",
+        "description": "Ordinary least squares on raw value plus optional covariates; reports R², RMSE, MAE and Bland-Altman. Previews unless save = true.",
+        "operationId": "fit",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalibrationFitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensorCalibration"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{sensorId}/calibration-samples": {
+      "get": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Paired lab samples of a sensor, newest first",
+        "operationId": "samples",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CalibrationSample"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Record a paired lab sample",
+        "description": "sensorValue and covariates default to the sensor's telemetry message at sampledAt.",
+        "operationId": "addSample",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalibrationSampleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalibrationSample"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/push/test": {
+      "post": {
+        "tags": [
+          "Push notifications"
+        ],
+        "summary": "Send a test notification to every browser of the signed-in account",
+        "operationId": "test",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushTestResult"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/push/subscriptions": {
+      "post": {
+        "tags": [
+          "Push notifications"
+        ],
+        "summary": "Subscribe this browser",
+        "description": "Body is JSON.stringify(pushSubscription). 201 when new, 200 when it already existed.",
+        "operationId": "subscribe",
+        "parameters": [
+          {
+            "name": "User-Agent",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushSubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Push notifications"
+        ],
+        "summary": "Unsubscribe this browser",
+        "description": "Call it on sign-out and when the user turns notifications off.",
+        "operationId": "unsubscribe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushUnsubscribeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/plants": {
+      "get": {
+        "tags": [
+          "Plants"
+        ],
+        "summary": "List plants by name",
+        "description": "active=true for the dashboard; omit for all.",
+        "operationId": "list_2",
+        "parameters": [
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Plant"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Plants"
+        ],
+        "summary": "Add a plant",
+        "description": "Send the name the farmer typed; a unique code is made from it.",
+        "operationId": "create_2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plant"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/irrigation/schedules": {
+      "get": {
+        "tags": [
+          "Irrigation schedule"
+        ],
+        "summary": "List watering times, earliest first",
+        "description": "With the next start and the result of the last run.",
+        "operationId": "list_3",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/IrrigationSchedule"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Irrigation schedule"
+        ],
+        "summary": "Add a daily watering time",
+        "description": "time is farm time (WIB) HH:mm; durationSeconds at most the pump's maxRunSeconds. A time that has already passed today starts tomorrow. 409 for a duplicate time or a too long duration.",
+        "operationId": "create_3",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IrrigationScheduleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/IrrigationSchedule"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/devices": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "List registered devices",
+        "operationId": "list_4",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Device"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Register a device",
+        "description": "Devices may also appear automatically on first contact when auto-registration is enabled.",
+        "operationId": "register_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/dev/telemetry": {
+      "post": {
+        "tags": [
+          "Development tools"
+        ],
+        "summary": "Inject a telemetry message",
+        "description": "Runs the same ingestion, validation and WebSocket push as a broker message.",
+        "operationId": "injectTelemetry",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryIngestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryIngestResult"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/dev/seed-season": {
+      "post": {
+        "tags": [
+          "Development tools"
+        ],
+        "summary": "Fill the database with one growing season of sensor history",
+        "description": "For every catalog sensor: hourly rollups for old days and raw readings every 5 minutes for the last days. Planting cycles and plants are left to the operator. Safe to repeat: existing data is never overwritten.",
+        "operationId": "seedSeason",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 75,
+              "maximum": 120,
+              "minimum": 7
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/dev/devices/{deviceCode}/status": {
+      "post": {
+        "tags": [
+          "Development tools"
+        ],
+        "summary": "Send an arbitrary status message as if it came from the device",
+        "description": "Use the actuators map to simulate reported actuator states, and powerSource (MAINS / BATTERY) to simulate an outage.",
+        "operationId": "injectStatus",
+        "parameters": [
+          {
+            "name": "deviceCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/dev/devices/{deviceCode}/heartbeat": {
+      "post": {
+        "tags": [
+          "Development tools"
+        ],
+        "summary": "Send a heartbeat as if it came from the device",
+        "operationId": "injectHeartbeat",
+        "parameters": [
+          {
+            "name": "deviceCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/dev/devices/{deviceCode}/command-ack": {
+      "post": {
+        "tags": [
+          "Development tools"
+        ],
+        "summary": "Acknowledge a command as if the device had executed it",
+        "description": "Lets the full command lifecycle, up to EXECUTED, be exercised without hardware.",
+        "operationId": "injectCommandAck",
+        "parameters": [
+          {
+            "name": "deviceCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/dev/devices/{deviceCode}/alerts": {
+      "post": {
+        "tags": [
+          "Development tools"
+        ],
+        "summary": "Raise an alert as if the edge agent had detected a fault",
+        "description": "For example {\"type\": \"SSR_SHORT\", \"severity\": \"CRITICAL\", \"actuatorCode\": \"DIST-PUMP\"}.",
+        "operationId": "injectAlert",
+        "parameters": [
+          {
+            "name": "deviceCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/dev/devices/{deviceCode}/ai-detections": {
+      "post": {
+        "tags": [
+          "Development tools"
+        ],
+        "summary": "Send an AI detection as if it came from the device",
+        "operationId": "injectDetection",
+        "parameters": [
+          {
+            "name": "deviceCode",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {}
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Exchange a refresh token for a new token pair",
+        "description": "The refresh token is single-use: the previous one is revoked. 401 when it is unknown, expired, revoked or the account is disabled.",
+        "operationId": "refresh",
+        "parameters": [
+          {
+            "name": "User-Agent",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "New token pair",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token no longer valid; sign in again",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "End this device's session",
+        "description": "Revokes the given refresh token. Always 204, even for an unknown token.",
+        "operationId": "logout",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Sign in",
+        "description": "Returns a short-lived JWT access token (Authorization: Bearer) and a refresh token that keeps the session alive for days.",
+        "operationId": "login",
+        "parameters": [
+          {
+            "name": "User-Agent",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/change-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Change the signed-in account's password",
+        "description": "Requires the current password. Every other session of the account is revoked; a fresh token pair is returned for this device.",
+        "operationId": "changePassword",
+        "parameters": [
+          {
+            "name": "User-Agent",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/actuators": {
+      "get": {
+        "tags": [
+          "Actuators"
+        ],
+        "summary": "List actuators",
+        "description": "Disabled actuators (not installed or retired) are left out unless includeDisabled=true, which the settings screen uses to re-enable one.",
+        "operationId": "list_5",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "includeDisabled",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Actuator"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Actuators"
+        ],
+        "summary": "Register an actuator",
+        "operationId": "register_2",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActuatorRegistrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Actuator"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/actuators/{id}/commands": {
+      "get": {
+        "tags": [
+          "Actuators"
+        ],
+        "summary": "List the command history of an actuator",
+        "operationId": "commandHistory",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Actuators"
+        ],
+        "summary": "Command an actuator",
+        "description": "Persists an audit record, then publishes the command to the device. A 202 means the\ncommand reached the messaging layer, not that the hardware acted on it - watch the\ncommand status, which only becomes EXECUTED when the device acknowledges it.\n",
+        "operationId": "issueCommand",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActuatorCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Command accepted and published",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActuatorCommand"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Actuator disabled or command invalid",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Messaging infrastructure unavailable; the attempt is still recorded as FAILED",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/actuators/{actuatorId}/calibrations": {
+      "get": {
+        "tags": [
+          "Pump calibration"
+        ],
+        "summary": "Flow calibrations of a pump, newest first",
+        "operationId": "calibrations_1",
+        "parameters": [
+          {
+            "name": "actuatorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PumpCalibration"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Pump calibration"
+        ],
+        "summary": "Record a flow calibration",
+        "description": "Send the trials (at least 3) and the flow is total volume / total time; or send flowMlPerSecond directly.",
+        "operationId": "create_4",
+        "parameters": [
+          {
+            "name": "actuatorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PumpCalibrationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PumpCalibration"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Get one account",
+        "operationId": "get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Update name, role or enabled",
+        "description": "You cannot change your own role or disable yourself; the last active admin is protected.",
+        "operationId": "update",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{id}": {
+      "get": {
+        "tags": [
+          "Sensors"
+        ],
+        "summary": "Get one sensor",
+        "operationId": "get_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sensor"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Sensors"
+        ],
+        "summary": "Update a sensor",
+        "description": "Used to name and enable a sensor that was auto-registered from telemetry.",
+        "operationId": "update_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SensorUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sensor"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/irrigation/schedules/{id}": {
+      "delete": {
+        "tags": [
+          "Irrigation schedule"
+        ],
+        "summary": "Delete a watering time",
+        "operationId": "delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Irrigation schedule"
+        ],
+        "summary": "Change a watering time, its duration, or switch it on/off",
+        "operationId": "update_2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IrrigationScheduleUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/IrrigationSchedule"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/alerts/{id}/acknowledge": {
+      "patch": {
+        "tags": [
+          "Alerts"
+        ],
+        "summary": "Acknowledge an alert",
+        "description": "Records the signed-in operator as the one who acknowledged it.",
+        "operationId": "acknowledge",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/actuators/{id}": {
+      "get": {
+        "tags": [
+          "Actuators"
+        ],
+        "summary": "Get one actuator",
+        "operationId": "get_2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Actuator"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Actuators"
+        ],
+        "summary": "Update an actuator",
+        "description": "Rename, enable or disable an output, or change its run-time limit (0 removes it).",
+        "operationId": "update_3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActuatorUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Actuator"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{sensorId}/calibration-samples.csv": {
+      "get": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Paired lab samples of a sensor as CSV",
+        "description": "UTF-8 with BOM, times in WIB; covariates become columns.",
+        "operationId": "samplesCsv",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{id}/latest": {
+      "get": {
+        "tags": [
+          "Sensors"
+        ],
+        "summary": "Get the most recent reading for a sensor",
+        "operationId": "latest",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensorReading"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{id}/history": {
+      "get": {
+        "tags": [
+          "Sensors"
+        ],
+        "summary": "Get readings for a sensor",
+        "description": "Defaults to the last 24 hours when no range is supplied.",
+        "operationId": "history",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Inclusive range start, ISO-8601 instant",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Inclusive range end, ISO-8601 instant",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{id}/history/aggregate": {
+      "get": {
+        "tags": [
+          "Sensors"
+        ],
+        "summary": "Get min/avg/max of a sensor per time interval",
+        "description": "For long-range charts. Defaults to the last 7 days. Points are aligned to the farm time                     zone (a 1d point starts at local midnight, 7d on Monday) and empty intervals are omitted.                     Intervals of 1h and wider also cover data older than the raw-reading retention; narrower                     intervals only cover the retention window. Raw values, not calibrated.",
+        "operationId": "historyAggregate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Inclusive range start, ISO-8601 instant",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Inclusive range end, ISO-8601 instant; defaults to now",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "description": "Point width: 1m, 5m, 15m, 30m, 1h, 3h, 6h, 12h, 1d or 7d. Omit to get about 300 points.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "1h"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensorHistorySeries"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/push/config": {
+      "get": {
+        "tags": [
+          "Push notifications"
+        ],
+        "summary": "Whether push is available and the VAPID public key",
+        "description": "Pass publicKey as applicationServerKey to pushManager.subscribe().",
+        "operationId": "config",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushConfig"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/plants/{id}": {
+      "get": {
+        "tags": [
+          "Plants"
+        ],
+        "summary": "Get one plant",
+        "operationId": "get_3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Plant"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Plants"
+        ],
+        "summary": "Delete a plant",
+        "description": "AI detections that pointed at it are kept without the plant. Deleting the LAST plant also clears the transplant date (GET /api/cultivation/active becomes 404), so the next season starts again from adding the first plant.",
+        "operationId": "delete_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/devices/{id}": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Get one device",
+        "operationId": "get_4",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Device"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/devices/{id}/status": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Get device liveness",
+        "description": "Includes the configured offline timeout so the client does not hard-code it.",
+        "operationId": "status",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/dev/outbox": {
+      "get": {
+        "tags": [
+          "Development tools"
+        ],
+        "summary": "Show what the backend would have published",
+        "description": "Only available while the mock transport is active (app.mqtt.enabled=false).",
+        "operationId": "outbox",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedMessage"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/dashboard/overview": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Everything the main dashboard needs, in one request",
+        "description": "Returns system status, device liveness, the latest reading of every enabled sensor,\nactuator states, open alerts, the latest AI detection and a recent activity feed.\nLive updates arrive over the WebSocket connection; this endpoint is for the initial\nrender and for reconnects.\n",
+        "operationId": "overview",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardOverview"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/cultivation/active": {
+      "get": {
+        "tags": [
+          "Cultivation"
+        ],
+        "summary": "Today's HST and growth phase",
+        "description": "HST counted from the transplant date, the phase in effect with its EC target (phases follow the AI team's fuzzy), and the next phase. 404 when the transplant date is not set.",
+        "operationId": "active",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Describe the account behind the current token",
+        "operationId": "me",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/alerts": {
+      "get": {
+        "tags": [
+          "Alerts"
+        ],
+        "summary": "List alerts",
+        "description": "Newest first. Every filter is optional and they combine: acknowledgement state, severity, and the related device, sensor or actuator.",
+        "operationId": "list_6",
+        "parameters": [
+          {
+            "name": "acknowledged",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "INFO",
+                "WARNING",
+                "CRITICAL"
+              ]
+            }
+          },
+          {
+            "name": "deviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "sensorId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "actuatorId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/alerts/{id}": {
+      "get": {
+        "tags": [
+          "Alerts"
+        ],
+        "summary": "Get one alert",
+        "operationId": "get_5",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/ai/inputs": {
+      "get": {
+        "tags": [
+          "AI detections"
+        ],
+        "summary": "Sensor snapshot for the AI service's fuzzy forms",
+        "description": "Field names match the AI service forms (run_fertilization, run_irrigation). Calibrated values when available. A field whose reading is missing or older than app.ai.inputs.max-age is null and listed in problems; do not dose unless readyForFertilization is true (safety rule S9).",
+        "operationId": "inputs",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiInputs"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/ai/detections": {
+      "get": {
+        "tags": [
+          "AI detections"
+        ],
+        "summary": "List AI detections",
+        "description": "Labels and scores are reported by the model; the backend stores them without interpreting them. Filters are exclusive: stationCode, then deviceId, then detectionType.",
+        "operationId": "list_7",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "detectionType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "stationCode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/ai/detections/{id}": {
+      "get": {
+        "tags": [
+          "AI detections"
+        ],
+        "summary": "Get one AI detection",
+        "operationId": "get_6",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiDetection"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/actuators/{id}/status": {
+      "get": {
+        "tags": [
+          "Actuators"
+        ],
+        "summary": "Get the last state the device reported for an actuator",
+        "description": "Null until the device reports one; the backend does not infer state from commands.",
+        "operationId": "status_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActuatorStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/actuators/{actuatorId}/dispensed": {
+      "get": {
+        "tags": [
+          "Pump calibration"
+        ],
+        "summary": "Volume dispensed by a pump",
+        "description": "Σ run time of EXECUTED activating commands x the flow calibrated before each run. Defaults to the last 24 hours.",
+        "operationId": "dispensed",
+        "parameters": [
+          {
+            "name": "actuatorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "Inclusive range start, ISO-8601 instant",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Inclusive range end, ISO-8601 instant",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispensedVolume"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/actuators/commands/{commandUid}": {
+      "get": {
+        "tags": [
+          "Actuators"
+        ],
+        "summary": "Get one command by its commandUid",
+        "description": "The commandUid is returned by POST /api/actuators/{id}/commands. Poll it until status is EXECUTED or FAILED (failureCode tells why, e.g. NO_RESPONSE, INTERLOCK_POWER).",
+        "operationId": "command",
+        "parameters": [
+          {
+            "name": "commandUid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActuatorCommand"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/sensors/{sensorId}/calibration-samples/{sampleId}": {
+      "delete": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Delete a wrongly entered lab sample",
+        "operationId": "deleteSample",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "sampleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TransplantDateRequest": {
+        "type": "object",
+        "properties": {
+          "transplantDate": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-09-12"
+          }
+        },
+        "required": [
+          "transplantDate"
+        ]
+      },
+      "CycleStatus": {
+        "type": "object",
+        "properties": {
+          "cycle": {
+            "$ref": "#/components/schemas/PlantingCycle"
+          },
+          "today": {
+            "type": "string",
+            "format": "date"
+          },
+          "hst": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currentPhase": {
+            "$ref": "#/components/schemas/GrowthPhase"
+          },
+          "nextPhase": {
+            "$ref": "#/components/schemas/GrowthPhase"
+          },
+          "daysUntilNextPhase": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "plantCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "GrowthPhase": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "startHst": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "endHst": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ecTargetMin": {
+            "type": "number"
+          },
+          "ecTargetMax": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "PlantingCycle": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "variety": {
+            "type": "string"
+          },
+          "transplantDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "expectedHarvestDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endedAt": {
+            "type": "string",
+            "format": "date"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PLANNED",
+              "ACTIVE",
+              "ENDED"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "phases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GrowthPhase"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UserCreateRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "pak.budi",
+            "maxLength": 64,
+            "minLength": 3,
+            "pattern": "[a-zA-Z0-9._-]+"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Budi Santoso",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERATOR",
+              "VIEWER"
+            ]
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "description": "Default true: the user must change the password at first sign-in"
+          }
+        },
+        "required": [
+          "password",
+          "role",
+          "username"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "description": "Account",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "username": {
+            "type": "string",
+            "example": "operator"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Field Operator"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERATOR",
+              "VIEWER"
+            ],
+            "example": "OPERATOR"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "mustChangePassword": {
+            "type": "boolean",
+            "description": "True after an admin reset or on a new account: the client should ask for a new password"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8
+          }
+        },
+        "required": [
+          "newPassword"
+        ]
+      },
+      "SensorRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string",
+            "example": "SOIL-A-PH",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "metricKey": {
+            "type": "string",
+            "description": "Namespaced with a dot when one device has several instruments of the same kind",
+            "example": "soil_a.ph",
+            "maxLength": 64,
+            "minLength": 0,
+            "pattern": "[A-Za-z0-9._-]+"
+          },
+          "name": {
+            "type": "string",
+            "example": "Canopy temperature",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "type": {
+            "type": "string",
+            "example": "TEMPERATURE",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "unit": {
+            "type": "string",
+            "example": "C",
+            "maxLength": 32,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Informational hardware binding, e.g. Modbus address and location"
+          }
+        },
+        "required": [
+          "code",
+          "deviceId",
+          "metricKey",
+          "name"
+        ]
+      },
+      "Sensor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceCode": {
+            "type": "string",
+            "example": "JETSON-001"
+          },
+          "code": {
+            "type": "string",
+            "example": "SENSOR-TEMP-01"
+          },
+          "metricKey": {
+            "type": "string",
+            "description": "Key this sensor uses inside a telemetry payload",
+            "example": "temperature"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "example": "TEMPERATURE"
+          },
+          "unit": {
+            "type": "string",
+            "example": "C"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "autoRegistered": {
+            "type": "boolean",
+            "description": "Created automatically from an unrecognised telemetry metric"
+          },
+          "description": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "string",
+            "description": "Informational hardware binding; never used for decisions"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DriftCheckRequest": {
+        "type": "object",
+        "properties": {
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Defaults to now"
+          },
+          "standardName": {
+            "type": "string",
+            "example": "EC 1413 uS/cm",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "referenceValue": {
+            "type": "number",
+            "example": 1413
+          },
+          "measuredValue": {
+            "type": "number",
+            "description": "Value read in the standard; defaults to the sensor's latest reading",
+            "example": 1388
+          },
+          "probeCleaned": {
+            "type": "boolean",
+            "description": "Probe was cleaned before this check (Protokol §7 step 6)"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "referenceValue",
+          "standardName"
+        ]
+      },
+      "DriftCheck": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sensorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sensorCode": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "standardName": {
+            "type": "string"
+          },
+          "referenceValue": {
+            "type": "number"
+          },
+          "measuredValue": {
+            "type": "number"
+          },
+          "deviation": {
+            "type": "number",
+            "description": "measured - reference"
+          },
+          "deviationPercent": {
+            "type": "number",
+            "description": "deviation / reference x 100; null when the reference is 0"
+          },
+          "probeCleaned": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "performedBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SensorCalibrationRequest": {
+        "type": "object",
+        "properties": {
+          "intercept": {
+            "type": "number",
+            "example": 3.2
+          },
+          "slope": {
+            "type": "number",
+            "example": 0.84
+          },
+          "covariates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Covariate metricKey -> coefficient; empty for a plain linear model"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Readings recorded from this instant on use the model; defaults to now"
+          },
+          "sampleCount": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "rSquared": {
+            "type": "number"
+          },
+          "rmse": {
+            "type": "number"
+          },
+          "mae": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "intercept",
+          "slope"
+        ]
+      },
+      "SensorCalibration": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Null for an unsaved fit preview"
+          },
+          "sensorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sensorCode": {
+            "type": "string"
+          },
+          "metricKey": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "LINEAR",
+              "REGRESSION"
+            ]
+          },
+          "intercept": {
+            "type": "number"
+          },
+          "slope": {
+            "type": "number"
+          },
+          "covariates": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Covariate metricKey -> coefficient"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sampleCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rSquared": {
+            "type": "number"
+          },
+          "rmse": {
+            "type": "number"
+          },
+          "mae": {
+            "type": "number"
+          },
+          "bias": {
+            "type": "number",
+            "description": "Bland-Altman mean difference (calibrated - lab)"
+          },
+          "loaLower": {
+            "type": "number",
+            "description": "Bland-Altman lower limit of agreement, bias - 1.96 SD"
+          },
+          "loaUpper": {
+            "type": "number",
+            "description": "Bland-Altman upper limit of agreement, bias + 1.96 SD"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "createdBy": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "True for the calibration applied to new readings"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CalibrationFitRequest": {
+        "type": "object",
+        "properties": {
+          "covariateKeys": {
+            "type": "array",
+            "description": "Covariate metric keys, e.g. soil moisture and temperature (Protokol §7 step 4)",
+            "example": [
+              "soil_a.moisture",
+              "soil_a.temperature"
+            ],
+            "items": {
+              "type": "string",
+              "maxLength": 64,
+              "minLength": 0
+            },
+            "maxItems": 5,
+            "minItems": 0
+          },
+          "samplesFrom": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Only samples taken from this instant on"
+          },
+          "samplesTo": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Only samples taken up to this instant"
+          },
+          "save": {
+            "type": "boolean",
+            "description": "Store the result as the sensor's calibration; false (default) only previews it"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When saved: readings from this instant on use the model; defaults to now"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        }
+      },
+      "CalibrationSampleRequest": {
+        "type": "object",
+        "properties": {
+          "sampledAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the soil sample was taken; defaults to now"
+          },
+          "sensorValue": {
+            "type": "number",
+            "description": "Raw sensor value at that moment; defaults to the latest reading",
+            "example": 212
+          },
+          "labValue": {
+            "type": "number",
+            "example": 0.18
+          },
+          "labMethod": {
+            "type": "string",
+            "example": "Kjeldahl",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "covariates": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Covariate metricKey -> value; defaults to the other metrics of the same telemetry message"
+          },
+          "sampleCode": {
+            "type": "string",
+            "example": "LAB-2026-031",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "labValue"
+        ]
+      },
+      "CalibrationSample": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sensorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sensorCode": {
+            "type": "string"
+          },
+          "sampledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sensorValue": {
+            "type": "number"
+          },
+          "labValue": {
+            "type": "number"
+          },
+          "labMethod": {
+            "type": "string"
+          },
+          "covariates": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "sampleCode": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "recordedBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PushTestResult": {
+        "type": "object",
+        "properties": {
+          "delivered": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Accepted by the push service"
+          },
+          "removed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Subscriptions the push service no longer knows; removed"
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Temporary failures; kept"
+          }
+        }
+      },
+      "Keys": {
+        "type": "object",
+        "properties": {
+          "p256dh": {
+            "type": "string",
+            "description": "base64url, 65 bytes",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "auth": {
+            "type": "string",
+            "description": "base64url, 16 bytes",
+            "maxLength": 64,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "auth",
+          "p256dh"
+        ]
+      },
+      "PushSubscriptionRequest": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "example": "https://fcm.googleapis.com/fcm/send/dXk...",
+            "maxLength": 1024,
+            "minLength": 0
+          },
+          "keys": {
+            "$ref": "#/components/schemas/Keys"
+          }
+        },
+        "required": [
+          "endpoint",
+          "keys"
+        ]
+      },
+      "PlantRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Free text the farmer types. Name or code is required.",
+            "example": "Melon pojok timur",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "code": {
+            "type": "string",
+            "description": "Optional; made from the name when empty",
+            "example": "Melon-pojok-timur",
+            "maxLength": 64,
+            "minLength": 0,
+            "pattern": "[A-Za-z0-9._-]+"
+          },
+          "description": {
+            "type": "string",
+            "example": "Dekat pintu masuk",
+            "maxLength": 255,
+            "minLength": 0
+          }
+        }
+      },
+      "Plant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string",
+            "example": "Melon-pojok-timur"
+          },
+          "name": {
+            "type": "string",
+            "example": "Melon pojok timur"
+          },
+          "description": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "IrrigationScheduleRequest": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "description": "Farm time (WIB), HH:mm",
+            "example": "06:00"
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Seconds; at most the pump's maxRunSeconds",
+            "example": 300,
+            "minimum": 1
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Default true"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "durationSeconds",
+          "time"
+        ]
+      },
+      "IrrigationSchedule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "time": {
+            "type": "string",
+            "description": "Farm time (WIB)",
+            "example": "06:00"
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "example": 300
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "nextRunAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Next start; null when disabled or irrigation scheduling is switched off"
+          },
+          "lastRunAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastResult": {
+            "type": "string",
+            "description": "STARTED, SKIPPED (refused by a safety rule), FAILED, MISSED (backend was down)",
+            "enum": [
+              "STARTED",
+              "SKIPPED",
+              "FAILED",
+              "MISSED"
+            ]
+          },
+          "lastReasonCode": {
+            "type": "string",
+            "description": "Why it was skipped/failed/missed: an interlock code (BACKUP_POWER, FLOAT_LOW, EXCLUSIVE_OPERATION, BLOCKED_WHILE_ACTIVE, DEVICE_NOT_ONLINE), an API error code, PUMP_UNAVAILABLE or BACKEND_DOWN. Translate this, not lastMessage.",
+            "example": "BACKUP_POWER"
+          },
+          "lastMessage": {
+            "type": "string",
+            "description": "Technical detail; English for safety refusals"
+          },
+          "lastCommandUid": {
+            "type": "string",
+            "description": "Command of the last run; GET /api/actuators/commands/{commandUid}"
+          }
+        }
+      },
+      "DeviceRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "deviceCode": {
+            "type": "string",
+            "example": "JETSON-001",
+            "maxLength": 64,
+            "minLength": 0,
+            "pattern": "[A-Za-z0-9._-]+"
+          },
+          "name": {
+            "type": "string",
+            "example": "Greenhouse edge device",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "type": {
+            "type": "string",
+            "example": "EDGE_GATEWAY",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "deviceCode",
+          "name"
+        ]
+      },
+      "Device": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceCode": {
+            "type": "string",
+            "example": "JETSON-01"
+          },
+          "name": {
+            "type": "string",
+            "example": "Jetson Orin Nano"
+          },
+          "type": {
+            "type": "string",
+            "example": "EDGE_GATEWAY"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ONLINE",
+              "OFFLINE",
+              "UNKNOWN"
+            ]
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "powerSource": {
+            "type": "string",
+            "description": "Last power source the device reported",
+            "example": "MAINS"
+          },
+          "powerSourceUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TelemetryIngestRequest": {
+        "type": "object",
+        "properties": {
+          "deviceCode": {
+            "type": "string",
+            "example": "JETSON-001",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Device-side timestamp; defaults to now when omitted"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": {},
+            "example": {
+              "temperature": 28.4,
+              "ph": 6.2
+            },
+            "minProperties": 1
+          }
+        },
+        "required": [
+          "data",
+          "deviceCode"
+        ]
+      },
+      "TelemetryIngestResult": {
+        "type": "object",
+        "properties": {
+          "telemetryMessageId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACCEPTED",
+              "PARTIALLY_ACCEPTED",
+              "REJECTED"
+            ]
+          },
+          "acceptedMetrics": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "rejectedMetrics": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "errorMessage": {
+            "type": "string"
+          }
+        }
+      },
+      "Result": {
+        "type": "object",
+        "properties": {
+          "sensors": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "hourlyRows": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rawReadings": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "RefreshRequest": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "description": "Standard error response",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-09-15T04:41:07Z"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "example": 400
+          },
+          "error": {
+            "type": "string",
+            "example": "VALIDATION_ERROR"
+          },
+          "message": {
+            "type": "string",
+            "example": "Invalid request"
+          },
+          "path": {
+            "type": "string",
+            "example": "/api/actuators/1/commands"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Field-level details, present for validation errors"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "Signed JWT access token"
+          },
+          "tokenType": {
+            "type": "string",
+            "example": "Bearer"
+          },
+          "expiresIn": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds until the access token expires",
+            "example": 3600
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "Opaque refresh token; send it to /api/auth/refresh before expiresAt passes"
+          },
+          "refreshExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the refresh token, and with it the session, ends"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "operator",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "password": {
+            "type": "string",
+            "example": "change-me",
+            "maxLength": 128,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "password",
+          "username"
+        ]
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "newPassword": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
+      },
+      "ActuatorRegistrationRequest": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string",
+            "example": "DOSING-N",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "name": {
+            "type": "string",
+            "example": "Pompa dosing N",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "type": {
+            "type": "string",
+            "example": "DOSING_PUMP",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "maxRunSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Longest run one activating command may request; omit for no limit",
+            "exclusiveMinimum": 0
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Informational hardware binding, e.g. Modbus address and channel"
+          }
+        },
+        "required": [
+          "code",
+          "deviceId",
+          "name"
+        ]
+      },
+      "Actuator": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceCode": {
+            "type": "string",
+            "example": "RIO-TANK-01"
+          },
+          "code": {
+            "type": "string",
+            "example": "DOSING-N"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "description": "Free text; the hardware catalogue decides the values",
+            "example": "DOSING_PUMP"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "currentState": {
+            "type": "string",
+            "description": "Last state reported by the device",
+            "example": "OFF"
+          },
+          "stateUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "maxRunSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Longest run one activating command may request; null means no limit"
+          },
+          "supportedCommands": {
+            "type": "array",
+            "description": "Command names this actuator accepts; null when its type is unrestricted",
+            "example": [
+              "ON",
+              "OFF"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "string",
+            "description": "Informational hardware binding; never used for decisions"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ActuatorCommandRequest": {
+        "type": "object",
+        "example": {
+          "command": "ON",
+          "parameters": {
+            "durationSeconds": 60
+          }
+        },
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Command name understood by the device",
+            "example": "ON",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Free-form arguments passed through to the device"
+          }
+        },
+        "required": [
+          "command"
+        ]
+      },
+      "ActuatorCommand": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "commandUid": {
+            "type": "string",
+            "description": "Correlation id echoed by the device in its acknowledgement"
+          },
+          "actuatorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actuatorCode": {
+            "type": "string"
+          },
+          "deviceId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceCode": {
+            "type": "string"
+          },
+          "commandType": {
+            "type": "string",
+            "example": "ON"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "OPERATOR",
+              "AUTOMATION",
+              "SYSTEM"
+            ]
+          },
+          "requestedBy": {
+            "type": "string",
+            "description": "Username that requested it; null for automation and system commands"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "SENT",
+              "EXECUTED",
+              "FAILED",
+              "CANCELLED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errorMessage": {
+            "type": "string"
+          },
+          "failureCode": {
+            "type": "string",
+            "description": "Reason code from a failed device acknowledgement, e.g. INTERLOCK_POWER; null when the failure carried no code",
+            "example": "INTERLOCK_FLOAT"
+          }
+        }
+      },
+      "PumpCalibrationRequest": {
+        "type": "object",
+        "properties": {
+          "calibratedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Defaults to now"
+          },
+          "trials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PumpCalibrationTrial"
+            },
+            "maxItems": 20,
+            "minItems": 0
+          },
+          "flowMlPerSecond": {
+            "type": "number",
+            "example": 2.05,
+            "exclusiveMinimum": 0
+          },
+          "trialCount": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "busVoltage": {
+            "type": "number",
+            "description": "Bus voltage during the test; defaults to the latest mains voltage reading",
+            "example": 221.4
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 0
+          }
+        }
+      },
+      "PumpCalibrationTrial": {
+        "type": "object",
+        "properties": {
+          "durationSeconds": {
+            "type": "number",
+            "example": 30,
+            "exclusiveMinimum": 0
+          },
+          "volumeMl": {
+            "type": "number",
+            "example": 61.5,
+            "exclusiveMinimum": 0
+          }
+        },
+        "required": [
+          "durationSeconds",
+          "volumeMl"
+        ]
+      },
+      "PumpCalibration": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actuatorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actuatorCode": {
+            "type": "string"
+          },
+          "calibratedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "flowMlPerSecond": {
+            "type": "number"
+          },
+          "trialCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trials": {
+            "type": "array",
+            "description": "[{durationSeconds, volumeMl}] when trials were recorded one by one",
+            "items": {}
+          },
+          "flowCvPercent": {
+            "type": "number",
+            "description": "Coefficient of variation of the per-trial flow, %"
+          },
+          "busVoltage": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "performedBy": {
+            "type": "string"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "True for the calibration used for new commands"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "UserUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERATOR",
+              "VIEWER"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SensorUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Replaces the informational hardware binding"
+          }
+        }
+      },
+      "IrrigationScheduleUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "example": "17:30"
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          }
+        }
+      },
+      "Alert": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "type": {
+            "type": "string",
+            "example": "DEVICE_OFFLINE"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "INFO",
+              "WARNING",
+              "CRITICAL"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "SYSTEM",
+              "DEVICE",
+              "AUTOMATION",
+              "OPERATOR"
+            ]
+          },
+          "relatedDeviceId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "relatedDeviceCode": {
+            "type": "string"
+          },
+          "relatedSensorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "relatedSensorCode": {
+            "type": "string"
+          },
+          "relatedActuatorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "relatedActuatorCode": {
+            "type": "string"
+          },
+          "acknowledged": {
+            "type": "boolean"
+          },
+          "acknowledgedBy": {
+            "type": "string"
+          },
+          "acknowledgedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "metadata": {
+            "type": "string",
+            "description": "Machine-readable details, e.g. failureCode (NO_RESPONSE, INTERLOCK_POWER, ...), commandUid; route on these, not on the message text"
+          }
+        }
+      },
+      "ActuatorUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 0
+          },
+          "type": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxRunSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "New run-time limit in seconds; 0 removes the limit",
+            "minimum": 0
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Replaces the informational hardware binding"
+          }
+        }
+      },
+      "PageResponse": {
+        "type": "object",
+        "description": "A page of results",
+        "properties": {
+          "content": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DriftCheck"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalElements": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "totalPages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "last": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SensorReading": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sensorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sensorCode": {
+            "type": "string",
+            "example": "SENSOR-TEMP-01"
+          },
+          "metricKey": {
+            "type": "string",
+            "example": "temperature"
+          },
+          "deviceId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceCode": {
+            "type": "string",
+            "example": "JETSON-001"
+          },
+          "value": {
+            "type": "number",
+            "example": 28.4
+          },
+          "calibratedValue": {
+            "type": "number",
+            "description": "Value corrected by the sensor's calibration valid at recordedAt; null when the sensor has no calibration or a covariate is missing. The raw value is never changed.",
+            "example": 27.9
+          },
+          "textValue": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "example": "C"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp reported by the device"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp the backend received the message"
+          }
+        }
+      },
+      "SensorHistoryPoint": {
+        "type": "object",
+        "properties": {
+          "bucketStart": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of this point; it covers [bucketStart, bucketStart + interval)"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Number of raw readings behind this point",
+            "example": 360
+          },
+          "min": {
+            "type": "number",
+            "example": 26.1
+          },
+          "avg": {
+            "type": "number",
+            "example": 28.4
+          },
+          "max": {
+            "type": "number",
+            "example": 31.0
+          }
+        }
+      },
+      "SensorHistorySeries": {
+        "type": "object",
+        "properties": {
+          "sensorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "sensorCode": {
+            "type": "string",
+            "example": "SENSOR-TEMP-01"
+          },
+          "metricKey": {
+            "type": "string",
+            "example": "temperature"
+          },
+          "unit": {
+            "type": "string",
+            "example": "C"
+          },
+          "interval": {
+            "type": "string",
+            "description": "Width of every point",
+            "example": "1h"
+          },
+          "intervalSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "example": 3600
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of the first point, aligned to the interval in the farm time zone"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SensorHistoryPoint"
+            }
+          }
+        }
+      },
+      "PushConfig": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "False when the server has no VAPID keys; hide the notification toggle"
+          },
+          "publicKey": {
+            "type": "string",
+            "description": "applicationServerKey for pushManager.subscribe(); null when disabled"
+          },
+          "minSeverity": {
+            "type": "string",
+            "description": "Alerts of this severity and above are pushed",
+            "enum": [
+              "INFO",
+              "WARNING",
+              "CRITICAL"
+            ]
+          },
+          "subscriptions": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Browsers subscribed for the signed-in account"
+          }
+        }
+      },
+      "DeviceStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceCode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ONLINE",
+              "OFFLINE",
+              "UNKNOWN"
+            ]
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "secondsSinceLastSeen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offlineTimeoutSeconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "powerSource": {
+            "type": "string",
+            "description": "Last power source the device reported; null if it never reports one",
+            "example": "MAINS"
+          },
+          "powerSourceUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "onBackupPower": {
+            "type": "boolean",
+            "description": "True when the reported power source is not a configured normal supply"
+          }
+        }
+      },
+      "PublishedMessage": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "string"
+          }
+        }
+      },
+      "ActuatorStatus": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "code": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "currentState": {
+            "type": "string"
+          },
+          "stateUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deviceCode": {
+            "type": "string"
+          }
+        }
+      },
+      "AiDetection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "deviceCode": {
+            "type": "string",
+            "example": "JETSON-001"
+          },
+          "plantId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "plantCode": {
+            "type": "string"
+          },
+          "detectionType": {
+            "type": "string",
+            "example": "DISEASE"
+          },
+          "label": {
+            "type": "string",
+            "description": "Class reported by the model; null for a scores-only multi-label result"
+          },
+          "confidence": {
+            "type": "number",
+            "example": 0.93
+          },
+          "scores": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Label to score map from a multi-label model, stored as reported"
+          },
+          "stationCode": {
+            "type": "string",
+            "example": "ST-01"
+          },
+          "panDirection": {
+            "type": "string",
+            "description": "Camera direction at the station: TIMUR or BARAT",
+            "example": "BARAT"
+          },
+          "captureId": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DashboardActivityEntry": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "example": "ACTUATOR_COMMAND"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "example": "EXECUTED"
+          },
+          "commandType": {
+            "type": "string",
+            "example": "ON"
+          },
+          "actuatorCode": {
+            "type": "string",
+            "example": "DIST-PUMP"
+          },
+          "deviceCode": {
+            "type": "string",
+            "example": "PANEL-01"
+          },
+          "actor": {
+            "type": "string",
+            "example": "operator"
+          },
+          "refId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Alert id for ALERT entries, command id for ACTUATOR_COMMAND entries"
+          },
+          "failureCode": {
+            "type": "string",
+            "description": "ACTUATOR_COMMAND: failure code of a FAILED command; ALERT: metadata.failureCode, or metadata.reasonCode (e.g. BACKUP_POWER for IRRIGATION_SKIPPED); otherwise null",
+            "example": "NO_RESPONSE"
+          },
+          "alertType": {
+            "type": "string",
+            "description": "Alert type for ALERT entries; null for commands",
+            "example": "IRRIGATION_SKIPPED"
+          }
+        }
+      },
+      "DashboardAlertSection": {
+        "type": "object",
+        "properties": {
+          "unacknowledged": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "critical": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "warning": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "active": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Alert"
+            }
+          }
+        }
+      },
+      "DashboardCultivationSection": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cycleCode": {
+            "type": "string"
+          },
+          "cycleName": {
+            "type": "string"
+          },
+          "transplantDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "hst": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currentPhase": {
+            "$ref": "#/components/schemas/GrowthPhase"
+          },
+          "nextPhase": {
+            "$ref": "#/components/schemas/GrowthPhase"
+          },
+          "daysUntilNextPhase": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "plantCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "DashboardDeviceSection": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "online": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offline": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unknown": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceStatus"
+            }
+          }
+        }
+      },
+      "DashboardOverview": {
+        "type": "object",
+        "properties": {
+          "system": {
+            "$ref": "#/components/schemas/DashboardSystemSection"
+          },
+          "devices": {
+            "$ref": "#/components/schemas/DashboardDeviceSection"
+          },
+          "sensors": {
+            "$ref": "#/components/schemas/DashboardSensorSection"
+          },
+          "actuators": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ActuatorStatus"
+            }
+          },
+          "alerts": {
+            "$ref": "#/components/schemas/DashboardAlertSection"
+          },
+          "latestAiDetection": {
+            "$ref": "#/components/schemas/AiDetection",
+            "description": "Null until the vision model reports something"
+          },
+          "recentActivity": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardActivityEntry"
+            }
+          },
+          "cultivation": {
+            "$ref": "#/components/schemas/DashboardCultivationSection",
+            "description": "Null when no planting cycle is active"
+          }
+        }
+      },
+      "DashboardSensorSection": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "enabled": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "latestReadings": {
+            "type": "array",
+            "description": "Latest value of every enabled sensor",
+            "items": {
+              "$ref": "#/components/schemas/SensorReading"
+            }
+          }
+        }
+      },
+      "DashboardSystemSection": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string"
+          },
+          "messagingTransport": {
+            "type": "string"
+          },
+          "messagingConnected": {
+            "type": "boolean"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AiInputReading": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "number",
+            "description": "Calibrated value when the sensor has a calibration, else raw"
+          },
+          "rawValue": {
+            "type": "number"
+          },
+          "calibrated": {
+            "type": "boolean"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ageSeconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fresh": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AiInputs": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "maxAgeSeconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Readings older than this are stale",
+            "example": 900
+          },
+          "hst": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Days since the transplant date; null when it is not set in Settings"
+          },
+          "phaseCode": {
+            "type": "string",
+            "example": "PEMBUAHAN"
+          },
+          "phaseName": {
+            "type": "string",
+            "example": "Pembuahan"
+          },
+          "readyForFertilization": {
+            "type": "boolean",
+            "description": "All fertilization fields present, fresh, and HST known"
+          },
+          "readyForIrrigation": {
+            "type": "boolean",
+            "description": "All irrigation fields present, fresh, and HST known"
+          },
+          "fertilization": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Form fields for run_fertilization: ec, ph, nitrogen_tanah, phosfor_tanah, kalium_tanah, hst"
+          },
+          "irrigation": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Form fields for run_irrigation: ec_air, suhu_air, suhu_udara, rh, humidity_tanah, temp_tanah, ph, nitrogen, phosfor, kalium, ec_tanah, hst"
+          },
+          "readings": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AiInputReading"
+            },
+            "description": "Per metric key: the reading behind each field"
+          },
+          "problems": {
+            "type": "array",
+            "description": "Why a form is not ready, e.g. \"fertilization.ph (tank.ph): stale, 1820 s old\"",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "DispensedVolume": {
+        "type": "object",
+        "properties": {
+          "actuatorId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "actuatorCode": {
+            "type": "string"
+          },
+          "actuatorName": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Executed activating commands that started in the range"
+          },
+          "totalSeconds": {
+            "type": "number",
+            "description": "Total run time, seconds"
+          },
+          "volumeMl": {
+            "type": "number",
+            "description": "Sum of run time x the flow calibrated before each run; null when no run was calibrated"
+          },
+          "uncalibratedRunCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Runs with no calibration before them; counted in totalSeconds but not in volumeMl"
+          },
+          "unknownDurationRunCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Runs whose duration is unknown (no duration parameter)"
+          },
+          "currentFlowMlPerSecond": {
+            "type": "number",
+            "description": "Flow of the current calibration, mL/s; null when never calibrated"
+          },
+          "currentCalibratedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the current calibration was made"
+          }
+        }
+      },
+      "PushUnsubscribeRequest": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "maxLength": 1024,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "endpoint"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "description": "Obtain a token from POST /api/auth/login",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
