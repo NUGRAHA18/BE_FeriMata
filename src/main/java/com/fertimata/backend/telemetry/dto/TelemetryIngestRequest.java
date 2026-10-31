@@ -7,12 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Telemetry submitted through the development-only injection endpoint.
- *
- * <p>Mirrors the MQTT payload so that testing through REST exercises the same ingestion path the
- * broker uses.
- */
+/** Dev-only injection payload; mirrors MQTT so REST exercises the same ingestion path. */
 @Schema(name = "TelemetryIngestRequest")
 public record TelemetryIngestRequest(
         @NotBlank @Size(max = 64) @Schema(example = "JETSON-001") String deviceCode,

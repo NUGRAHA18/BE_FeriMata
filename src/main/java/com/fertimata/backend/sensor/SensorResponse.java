@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonRawValue;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
-/** Read model for a sensor. */
 @Schema(name = "Sensor")
 public record SensorResponse(
         Long id,

@@ -17,12 +17,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * Debit terukur satu pompa (Protokol-Data.md §8).
- *
- * <p>Append-only: debit yang berlaku untuk sebuah perintah adalah kalibrasi terakhir sebelum perintah
- * itu dijalankan, jadi volume pupuk masa lalu tidak berubah saat pompa dikalibrasi ulang.
- */
+/** Debit terukur satu pompa (Protokol-Data.md §8). Append-only: volume lampau tetap memakai kalibrasi yang berlaku saat itu. */
 @Entity
 @Table(name = "actuator_calibration")
 @Getter

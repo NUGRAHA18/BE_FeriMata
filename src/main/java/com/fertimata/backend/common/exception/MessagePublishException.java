@@ -1,14 +1,6 @@
 package com.fertimata.backend.common.exception;
 
-/**
- * Thrown when the backend cannot hand a message to the messaging infrastructure (broker
- * unreachable, publish rejected, ...).
- *
- * <p>Named after the capability rather than the library, so that replacing MQTT later does not
- * ripple into business code. Deliberately distinct from
- * {@code org.springframework.messaging.MessagingException}: business services should never import
- * messaging-library types.
- */
+/** Broker publish failed. Library-neutral name so business code never imports messaging types. */
 public class MessagePublishException extends ApiException {
 
     public MessagePublishException(String message, Throwable cause) {

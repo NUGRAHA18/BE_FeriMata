@@ -11,9 +11,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
-/**
- * Merespons permintaan yang tidak menyertakan token atau menggunakan token yang gagal diverifikasi.
- */
+/** Merespons permintaan tanpa token atau dengan token yang gagal diverifikasi. */
 
 @Component
 public class RestAuthenticationEntryPoint implements AuthenticationEntryPoint {

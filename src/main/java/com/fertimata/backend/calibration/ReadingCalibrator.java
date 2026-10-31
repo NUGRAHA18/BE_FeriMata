@@ -20,13 +20,8 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
- * Mengubah pembacaan menjadi respons dengan {@code calibratedValue}.
- *
- * <p>Model yang dipakai adalah kalibrasi terakhir yang {@code validFrom}-nya tidak lewat dari
- * {@code recordedAt} pembacaan, jadi riwayat lama tetap memakai model yang berlaku saat itu. Kovariat
- * (kelembapan, suhu tanah) diambil dari pesan telemetri yang sama - sensor 7-in-1 mengirim semuanya
- * bersamaan - lebih dulu dari daftar yang sedang dikonversi, baru ke database untuk yang kurang.
- * Pemanggil tanpa kalibrasi apa pun hanya membayar satu query kecil per halaman.
+ * Menambah {@code calibratedValue}: model = kalibrasi terakhir dengan validFrom ≤ recordedAt, jadi riwayat lama memakai
+ * model lamanya. Kovariat dari pesan telemetri yang sama: dulu dari daftar, lalu database untuk yang kurang.
  */
 @Component
 public class ReadingCalibrator {

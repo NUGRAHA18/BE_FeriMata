@@ -3,12 +3,7 @@ package com.fertimata.backend.device;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
-/**
- * Liveness view of a device.
- *
- * <p>The timeout is included so the PWA can render "last seen 40s ago, considered offline after 90s"
- * without hard-coding a number the backend owns.
- */
+/** Liveness view; includes the timeout so the PWA does not hard-code it. */
 @Schema(name = "DeviceStatus")
 public record DeviceStatusResponse(
         Long id,

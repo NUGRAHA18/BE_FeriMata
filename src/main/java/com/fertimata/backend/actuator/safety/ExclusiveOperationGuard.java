@@ -9,16 +9,8 @@ import java.util.Optional;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * Refuses to start an actuator while one of a conflicting type is running.
- *
- * <p>FERTIMATA Rev A asks for this between dosing and the camera trolley, because the UPS only gives
- * 4 A to the loads, and between dosing and the distribution pump, because the solution is still being
- * mixed. The groups are configuration.
- *
- * <p>"Running" is the state the device last <em>reported</em>. A report can be stale, so this guard
- * narrows the window rather than closing it; the edge agent owns the hard sequencing.
- */
+/** Symmetric exclusion between type groups. Rev A: dosing vs trolley (UPS gives loads only 4 A) and vs distribution
+ * pump (still mixing). Uses last reported state, so it narrows the window; the edge owns hard sequencing. */
 @Component
 @Order(40)
 public class ExclusiveOperationGuard implements CommandGuard {

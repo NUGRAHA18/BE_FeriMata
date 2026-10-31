@@ -23,14 +23,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * DEVELOPMENT ONLY. Mengisi database dev dengan riwayat sensor satu musim tanam agar grafik jangka
- * panjang bisa dikerjakan dan didemokan tanpa menunggu musim sungguhan.
- *
- * <p>Riwayat sensor ditulis seperti hasil sistem yang sudah berjalan lama: hari-hari lama hanya ada
- * di {@code sensor_reading_hourly} (data mentahnya sudah dihapus retensi), beberapa hari terakhir ada
- * sebagai pembacaan mentah tiap 5 menit. Siklus tanam dan tanaman tidak dibuat: itu diisi operator
- * sendiri. Aman dijalankan berulang: data yang sudah ada tidak ditimpa. Angka dibuat deterministik
- * (seed tetap) supaya tangkapan layar konsisten.
+ * DEVELOPMENT ONLY. Mengisi riwayat sensor satu musim: hari lama hanya di {@code sensor_reading_hourly}, beberapa hari
+ * terakhir mentah tiap 5 menit. Tidak menimpa data yang ada; deterministik (seed tetap).
  */
 @Component
 @Profile("dev")
@@ -168,14 +162,7 @@ public class DevSeasonSeeder {
         return sum(counts);
     }
 
-    /**
-     * Pola nilai satu metrik.
-     *
-     * @param shape nilai dasar dari (hari sejak tanam, jam lokal 0-24)
-     * @param noise simpangan acak per sampel
-     * @param hourlySpread setengah rentang min-maks dalam satu jam
-     * @param floor nilai terkecil yang masuk akal (mis. lux tidak negatif)
-     */
+    /** Pola satu metrik: shape(hari sejak tanam, jam lokal), noise per sampel, setengah rentang per jam, nilai minimum. */
     private record MetricPattern(DoubleBinaryOperator shape, double noise, double hourlySpread, double floor) {
 
         double value(Instant seasonStart, Instant at, ZoneId zone, Random random) {

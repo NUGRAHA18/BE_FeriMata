@@ -35,22 +35,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Accepts, dispatches and tracks actuator commands.
- *
- * <p>The flow is deliberately explicit, because this is the one place where the backend causes
- * something physical to happen:
- *
- * <ol>
- *   <li>authorise and validate the request, including the configured interlocks
- *   <li>persist a PENDING audit record, in its own transaction
- *   <li>hand it to the transport
- *   <li>record SENT, or FAILED plus an alert
- * </ol>
- *
- * <p>The service never touches MQTT: it depends on {@link ActuatorCommandTransport}, a port the
- * domain owns. And it never claims a command was executed - only a device acknowledgement does that.
- */
+/** Command flow: authorise + interlocks, persist PENDING, hand to transport, record SENT or FAILED + alert.
+ * Never touches MQTT (uses {@link ActuatorCommandTransport}); only a device ACK marks EXECUTED. */
 @Service
 public class ActuatorCommandService {
 
@@ -84,12 +70,7 @@ public class ActuatorCommandService {
         this.jsonSupport = jsonSupport;
     }
 
-    /**
-     * Issues a command on behalf of a signed-in operator.
-     *
-     * @param username the authenticated account, taken from the security context by the controller -
-     *     never from the request body
-     */
+    /** Issues an operator command; {@code username} comes from the security context, never the request body. */
     public ActuatorCommandResponse issueOperatorCommand(
             Long actuatorId, ActuatorCommandRequest request, String username) {
         return issue(actuatorId, request, CommandSource.OPERATOR, username);
@@ -157,9 +138,8 @@ public class ActuatorCommandService {
         // configuration-driven guards keyed by actuator type; none of them is named here.
         safetyPolicy.check(actuator, request.command(), parameters);
         if (actuator.getDevice().getStatus() != DeviceStatus.ONLINE) {
-            // Not an error by default: the broker holds the message and the wire expiry bounds how
-            // long it stays valid. app.actuator.safety.refuse-when-device-offline turns this into a
-            // refusal for activating commands.
+            // Not an error by default: the broker holds it and the wire expiry bounds it;
+            // app.actuator.safety.refuse-when-device-offline turns this into a refusal for activating commands.
             log.warn(
                     "Issuing command {} while device {} is {}",
                     request.command(),
@@ -168,12 +148,7 @@ public class ActuatorCommandService {
         }
     }
 
-    /**
-     * Applies a device acknowledgement.
-     *
-     * <p>This is the only path that can mark a command EXECUTED. An acknowledgement for an unknown
-     * correlation id is logged and dropped rather than guessed at.
-     */
+    /** Applies a device ACK, the only path to EXECUTED; an unknown correlation id is logged and dropped. */
     @Transactional
     public void applyAcknowledgement(String deviceCode, CommandAckPayload ack) {
         if (ack == null || ack.commandUid() == null || ack.commandUid().isBlank()) {

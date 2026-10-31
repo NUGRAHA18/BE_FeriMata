@@ -7,12 +7,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Satu sampel lab berpasangan.
- *
- * <p>{@code sensorValue} dan {@code covariates} yang dikosongkan diisi dari pesan telemetri terakhir
- * sensor ini pada {@code sampledAt} - itulah "ukur berpasangan dan simultan" di Protokol §7.
- */
+/** Sampel lab berpasangan; sensorValue/covariates kosong diisi dari telemetri terakhir pada sampledAt (Protokol §7). */
 @Schema(name = "CalibrationSampleRequest")
 public record CalibrationSampleRequest(
         @Schema(description = "When the soil sample was taken; defaults to now") Instant sampledAt,

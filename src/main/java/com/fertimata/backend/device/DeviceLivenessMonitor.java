@@ -7,13 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * Periodically flips devices that have gone quiet to OFFLINE.
- *
- * <p>This exists because "offline" cannot be reported by the thing that is offline. The interval is
- * configuration, not a constant: how often this should run depends on the heartbeat rate the
- * hardware team settles on.
- */
+/** Flips quiet devices to OFFLINE ("offline" cannot self-report); the interval is config, tied to the heartbeat rate. */
 @Component
 public class DeviceLivenessMonitor {
 

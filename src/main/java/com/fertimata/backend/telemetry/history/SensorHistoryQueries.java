@@ -8,12 +8,7 @@ import java.util.List;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
-/**
- * SQL PostgreSQL untuk ringkasan per jam dan grafik teragregasi.
- *
- * <p>SQL langsung, bukan JPQL: pengelompokan per slot waktu dan upsert tidak ada di JPQL, dan memuat
- * ratusan ribu pembacaan ke memori Jetson hanya untuk dirata-rata tidak bisa diterima.
- */
+/** SQL PostgreSQL ringkasan per jam dan grafik; native karena JPQL tak punya slot waktu/upsert, dan agregasi harus di DB. */
 @Component
 public class SensorHistoryQueries {
 
@@ -26,15 +21,8 @@ public class SensorHistoryQueries {
     public record BucketRow(Instant bucketStart, long count, BigDecimal min, BigDecimal avg, BigDecimal max) {}
 
     /**
-     * Menghitung ulang setiap jam (per sensor) yang menerima pembacaan sejak {@code receivedSince}.
-     *
-     * <p>Dipilih menurut {@code received_at}, bukan {@code recorded_at}: buffer edge yang dikirim
-     * setelah koneksi pulih membawa {@code recorded_at} lama, dan jamnya tetap harus diperbarui. Jam
-     * dihitung ulang dari seluruh pembacaannya, jadi menjalankan ulang tidak pernah menggandakan.
-     *
-     * @param notBefore jam sebelum ini tidak disentuh: pembacaan mentahnya mungkin sudah sebagian
-     *     dihapus retensi, dan menghitung ulang akan menimpa ringkasan yang utuh dengan yang terpotong
-     * @return jumlah baris ringkasan yang ditulis
+     * Menghitung ulang jam yang menerima pembacaan sejak {@code receivedSince} (received_at: buffer edge membawa recorded_at
+     * lama); idempoten. Jam sebelum {@code notBefore} tidak disentuh agar ringkasan utuh tak ditimpa data terpotong retensi.
      */
     public int rollUpReceivedSince(Instant receivedSince, Instant notBefore) {
         return jdbc.sql(
@@ -71,16 +59,8 @@ public class SensorHistoryQueries {
     }
 
     /**
-     * Titik grafik untuk satu sensor dalam {@code [from, to]}.
-     *
-     * <p>Jam sebelum {@code hourlyUntil} diambil dari {@code sensor_reading_hourly}, sisanya dari
-     * pembacaan mentah, lalu keduanya digabung per titik. Rata-rata dihitung dari jumlah dan cacah,
-     * sehingga titik yang separuh dari ringkasan dan separuh dari data mentah tetap tepat.
-     *
-     * @param hourlyUntil batas eksklusif bagian ringkasan; isi dengan {@code from} untuk hanya memakai
-     *     data mentah
-     * @param stepSeconds lebar titik
-     * @param offsetSeconds offset zona waktu, supaya titik harian mulai pukul 00:00 waktu kebun, bukan UTC
+     * Titik grafik satu sensor: sebelum {@code hourlyUntil} dari ringkasan, sisanya mentah; rata-rata dari jumlah/cacah.
+     * {@code offsetSeconds} = offset zona agar titik harian mulai 00:00 waktu kebun, bukan UTC.
      */
     public List<BucketRow> buckets(
             long sensorId, Instant from, Instant to, Instant hourlyUntil, long stepSeconds, long offsetSeconds) {

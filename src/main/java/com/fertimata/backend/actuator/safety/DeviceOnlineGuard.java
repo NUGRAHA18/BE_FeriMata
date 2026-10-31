@@ -6,13 +6,8 @@ import java.util.Map;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * Optionally refuses to switch something on for a device that is not currently heard from.
- *
- * <p>With a persistent MQTT session the broker would hold the command and deliver it whenever the
- * device returns - possibly hours later, into a tank nobody is watching. On real hardware that is
- * worse than a refusal the operator can see.
- */
+/** Optionally refuses activating commands for a device that is not ONLINE: a persistent session would deliver
+ * them whenever it returns, maybe hours later into an unwatched tank. */
 @Component
 @Order(20)
 public class DeviceOnlineGuard implements CommandGuard {

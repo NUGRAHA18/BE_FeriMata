@@ -33,10 +33,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-/**
- * The interlocks are the part of the backend that stands between a click and a pump, so each rule is
- * pinned down here - including the one that must hold for every guard: a stop is never blocked.
- */
+/** Pins every interlock rule, including the universal one: a stop is never blocked. */
 class CommandGuardsTest {
 
     /** Mirrors the FERTIMATA Rev A policy in hardware/fertimata-rev-a.yml. */
@@ -286,10 +283,8 @@ class CommandGuardsTest {
     @Nested
     class Vocabulary {
 
-        /**
-         * Mirrors the virtual actuators of hardware/fertimata-rev-a.yml (BE-1). DOSING_LOOP left the catalog (V9)
-         * but stays here to cover the NUMBER and TEXT parameter kinds.
-         */
+        /** Mirrors virtual actuators of hardware/fertimata-rev-a.yml (BE-1); DOSING_LOOP (out of the catalog since V9)
+         * stays to cover NUMBER and TEXT parameter kinds. */
         private static final CommandVocabularyProperties VOCABULARY = new CommandVocabularyProperties(List.of(
                 new CommandVocabularyProperties.Vocabulary(List.of("DOSING_PUMP"), List.of("ON", "OFF"), null),
                 new CommandVocabularyProperties.Vocabulary(

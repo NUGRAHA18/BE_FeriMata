@@ -11,9 +11,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.stereotype.Component;
 
-/**
- * Merespons permintaan terautentikasi yang tidak memiliki peran (<i>role</i>) yang dibutuhkan.
- * */
+/** Merespons permintaan terautentikasi yang tidak memiliki role yang dibutuhkan. */
 
 @Component
 public class RestAccessDeniedHandler implements AccessDeniedHandler {

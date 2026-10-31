@@ -132,13 +132,8 @@ public class ActuatorService {
         return publishUpdated(actuator);
     }
 
-    /**
-     * Records a state the device reported for one of its actuators.
-     *
-     * <p>Unknown actuator codes are logged and ignored rather than auto-created: an actuator is
-     * something an operator can switch on, and inventing one from an unverified message would put a
-     * control in the UI that nobody provisioned.
-     */
+    /** Records a device-reported state. Unknown actuator codes are ignored, never auto-created:
+     * an unverified message must not add a control nobody provisioned. */
     @Transactional
     public void reportState(Device device, String actuatorCode, String state, Instant reportedAt) {
         Optional<Actuator> actuator = actuatorRepository.findByDeviceIdAndCode(device.getId(), actuatorCode);

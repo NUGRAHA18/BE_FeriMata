@@ -3,7 +3,6 @@ package com.fertimata.backend.device;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
-/** Read model for a device. */
 @Schema(name = "Device")
 public record DeviceResponse(
         Long id,

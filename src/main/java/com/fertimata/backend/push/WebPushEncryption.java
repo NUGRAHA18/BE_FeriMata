@@ -15,13 +15,8 @@ import javax.crypto.Mac;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-/**
- * Enkripsi payload Web Push, RFC 8291 ({@code Content-Encoding: aes128gcm}, RFC 8188).
- *
- * <p>Ditulis dengan kriptografi JDK saja: ECDH P-256, HKDF-SHA-256 dan AES-128-GCM. Server push
- * (Google, Mozilla, Apple) hanya meneruskan byte terenkripsi; hanya browser pemilik langganan yang
- * bisa membukanya.
- */
+/** Enkripsi payload Web Push RFC 8291 ({@code aes128gcm}, RFC 8188) dengan kriptografi JDK saja
+ * (ECDH P-256, HKDF-SHA-256, AES-128-GCM); hanya browser pelanggan yang bisa membukanya. */
 final class WebPushEncryption {
 
     /** Ukuran record; payload notifikasi selalu muat dalam satu record. */
@@ -34,11 +29,7 @@ final class WebPushEncryption {
 
     private WebPushEncryption() {}
 
-    /**
-     * @param uaPublic kunci {@code p256dh} langganan, 65 byte
-     * @param authSecret kunci {@code auth} langganan, 16 byte
-     * @return badan permintaan HTTP: header aes128gcm diikuti ciphertext
-     */
+    /** {@code uaPublic} = p256dh 65 byte, {@code authSecret} = auth 16 byte; hasil: header aes128gcm + ciphertext. */
     static byte[] encrypt(byte[] uaPublic, byte[] authSecret, byte[] plaintext) throws GeneralSecurityException {
         KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
         generator.initialize(EcKeys.P256);

@@ -88,9 +88,8 @@ public class SecurityConfig {
                     requests.requestMatchers("/api/push/**").authenticated();
                     // Kelola akun hanya ADMIN.
                     requests.requestMatchers("/api/users/**").hasRole(Role.Names.ADMIN);
-                    // VIEWER hanya membaca: setiap permintaan yang mengubah data butuh OPERATOR (ADMIN
-                    // mewarisinya lewat RoleHierarchy). Satu aturan di sini lebih aman daripada
-                    // mengandalkan anotasi di tiap controller.
+                    // VIEWER hanya membaca: setiap permintaan pengubah butuh OPERATOR (ADMIN mewarisi lewat RoleHierarchy);
+                    // satu aturan di sini lebih aman daripada anotasi di tiap controller.
                     requests.requestMatchers(HttpMethod.POST, "/api/**").hasRole(Role.Names.OPERATOR);
                     requests.requestMatchers(HttpMethod.PUT, "/api/**").hasRole(Role.Names.OPERATOR);
                     requests.requestMatchers(HttpMethod.PATCH, "/api/**").hasRole(Role.Names.OPERATOR);
@@ -107,16 +106,8 @@ public class SecurityConfig {
         return http.build();
     }
 
-   /**
-     * BCrypt dengan faktor beban (<i>cost factor</i>) bawaan dari pustaka. Dipilih dibandingkan 
-     * <i>delegating encoder</i> karena tidak ada format kata sandi terwariskan (<i>legacy</i>) yang perlu 
-     * dimigrasi, serta penggunaan format tunggal menjaga konsistensi nilai <i>hash</i> yang tersimpan.
-     */
-    /**
-     * ADMIN > OPERATOR > VIEWER. Dipakai otomatis oleh aturan URL di atas dan oleh
-     * {@code @PreAuthorize("hasRole(...)")}, sehingga aturan yang menyebut OPERATOR ikut berlaku
-     * untuk ADMIN tanpa menulis dua nama di setiap tempat.
-     */
+    /** ADMIN > OPERATOR > VIEWER, dipakai aturan URL dan {@code @PreAuthorize("hasRole(...)")},
+     * sehingga aturan OPERATOR otomatis berlaku untuk ADMIN. */
     @Bean
     public RoleHierarchy roleHierarchy() {
         return RoleHierarchyImpl.withDefaultRolePrefix()
@@ -127,6 +118,7 @@ public class SecurityConfig {
                 .build();
     }
 
+    /** BCrypt cost bawaan; tanpa delegating encoder karena tidak ada format sandi lama yang perlu dimigrasi. */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();

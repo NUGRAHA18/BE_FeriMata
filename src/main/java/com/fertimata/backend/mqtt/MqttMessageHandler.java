@@ -1,18 +1,10 @@
 package com.fertimata.backend.mqtt;
 
-/**
- * Handles one kind of inbound message.
- *
- * <p>Implementations translate a wire payload into a call on a business service. They must not
- * contain business logic themselves - that is what keeps the messaging layer replaceable.
- */
+/** Handles one inbound kind by translating the payload into a service call; no business logic here. */
 public interface MqttMessageHandler {
 
     TopicKind handles();
 
-    /**
-     * @param deviceCode device code taken from the topic, not from the payload
-     * @param payload raw message body
-     */
+    /** {@code deviceCode} comes from the topic, not the payload. */
     void handle(String deviceCode, String payload);
 }

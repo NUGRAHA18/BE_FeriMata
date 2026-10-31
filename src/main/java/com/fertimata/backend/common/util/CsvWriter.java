@@ -3,12 +3,7 @@ package com.fertimata.backend.common.util;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
-/**
- * Penulis CSV RFC 4180 yang minimal untuk ekspor laporan.
- *
- * <p>Diawali BOM UTF-8 supaya Excel membaca huruf seperti "°" dan "µ" dengan benar. Angka ditulis
- * dengan titik desimal tanpa nol di belakang; kolom teks dikutip bila perlu.
- */
+/** CSV RFC 4180 minimal; diawali BOM UTF-8 agar Excel membaca "°"/"µ", angka tanpa nol di belakang. */
 public final class CsvWriter {
 
     private final StringBuilder out = new StringBuilder("\uFEFF");

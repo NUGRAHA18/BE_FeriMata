@@ -32,12 +32,8 @@ public class PushSubscriptionService {
         this.client = client;
     }
 
-    /**
-     * Mendaftarkan browser ini untuk akun yang sedang login. Endpoint yang sama didaftarkan ulang
-     * (mis. HP yang dipakai bergantian) berpindah ke akun terakhir dengan kunci terbaru.
-     *
-     * @return true bila langganan baru dibuat
-     */
+    /** Mendaftarkan browser untuk akun yang login; endpoint yang sama (HP bergantian) pindah ke akun terakhir
+     * dengan kunci terbaru. True bila langganan baru dibuat. */
     @Transactional
     public boolean subscribe(String username, PushSubscriptionRequest request, String userAgent) {
         if (!client.enabled()) {

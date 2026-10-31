@@ -65,10 +65,7 @@ public class PlantService {
         return PlantResponse.from(saved);
     }
 
-    /**
-     * Menghapus tanaman. Deteksi AI yang menunjuknya tetap ada tanpa tanaman. Semua tanaman ditanam
-     * bersamaan, jadi saat tanaman terakhir dihapus tanggal tanam ikut dikosongkan (keputusan 29 Okt 2026).
-     */
+    /** Menghapus tanaman (deteksi AI tetap ada); tanaman terakhir ikut mengosongkan tanggal tanam (keputusan 29 Okt 2026). */
     @Transactional
     public void delete(Long id) {
         Plant plant = require(id);

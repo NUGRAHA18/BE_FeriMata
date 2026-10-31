@@ -16,13 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * Mengirim satu notifikasi terenkripsi ke server push sebuah langganan.
- *
- * <p>Kunci VAPID dibaca dan diperiksa saat aplikasi menyala. Kunci yang rusak atau tidak sepasang
- * menghentikan startup, sama seperti {@code JWT_SECRET} yang kosong: lebih baik gagal jelas di awal
- * daripada notifikasi darurat diam-diam tidak pernah sampai.
- */
+/** Mengirim satu notifikasi terenkripsi. Kunci VAPID rusak/tidak sepasang menghentikan startup (seperti
+ * {@code JWT_SECRET} kosong): lebih baik gagal di awal daripada notifikasi darurat diam-diam tidak sampai. */
 @Component
 public class WebPushClient {
 

@@ -5,12 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Read model for a single measurement.
- *
- * <p>Both {@code value} and {@code textValue} are exposed: numeric metrics fill the first, and a
- * future non-numeric metric fills the second without a new endpoint.
- */
+/** Single measurement; {@code value} for numeric, {@code textValue} for non-numeric metrics. */
 @Schema(name = "SensorReading")
 public record SensorReadingResponse(
         Long id,

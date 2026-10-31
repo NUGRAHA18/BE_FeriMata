@@ -6,12 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
-/**
- * Builds and parses broker topics from the configured templates.
- *
- * <p>Every topic string in the system passes through here. That is what makes the "topic convention
- * is not final" problem a one-file problem.
- */
+/** Builds and parses topics from the configured templates; every topic string passes through here. */
 @Component
 public class MqttTopicResolver {
 
@@ -51,13 +46,8 @@ public class MqttTopicResolver {
         return templates.containsKey(kind);
     }
 
-    /**
-     * Works out which kind of message arrived and which device sent it.
-     *
-     * <p>Templates are matched from the most specific to the least specific, so a
-     * {@code .../command/ack} topic is not mistaken for a {@code .../command} topic when one
-     * template is a prefix of another.
-     */
+    /** Resolves kind and device from a topic, matching the most specific template first so
+     * {@code .../command/ack} is not mistaken for {@code .../command}. */
     public Optional<ResolvedTopic> parse(String topic) {
         if (topic == null || topic.isBlank()) {
             return Optional.empty();

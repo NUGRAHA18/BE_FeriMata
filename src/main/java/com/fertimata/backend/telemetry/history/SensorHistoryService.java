@@ -15,13 +15,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Riwayat sensor teragregasi (min/rata-rata/maks per titik) untuk grafik jangka panjang.
- *
- * <p>Titik mulai 1 jam disusun dari {@code sensor_reading_hourly}, kecuali beberapa jam terakhir yang
- * mungkin belum diringkas job - bagian itu diambil dari pembacaan mentah. Titik di bawah 1 jam hanya
- * bisa dari pembacaan mentah, jadi hanya tersedia selama masa retensi.
- */
+/** Min/rata-rata/maks per titik: ≥ 1 jam dari ringkasan (+ mentah untuk jam terakhir), < 1 jam hanya selama retensi. */
 @Service
 public class SensorHistoryService {
 
@@ -47,10 +41,7 @@ public class SensorHistoryService {
         this.clock = clock;
     }
 
-    /**
-     * @param intervalLabel salah satu {@link HistoryInterval#labels()}; null memilih interval terkecil
-     *     yang menghasilkan paling banyak {@code target-points} titik
-     */
+    /** {@code intervalLabel} null memilih interval terkecil dengan paling banyak {@code target-points} titik. */
     @Transactional(readOnly = true)
     public SensorHistorySeriesResponse series(Long sensorId, Instant from, Instant to, String intervalLabel) {
         Sensor sensor = sensorService.require(sensorId);
@@ -96,10 +87,7 @@ public class SensorHistoryService {
         return retention.enabled() ? Optional.of(now.minus(retention.readingsMaxAge())) : Optional.empty();
     }
 
-    /**
-     * Jam sebelum ini dianggap sudah diringkas. Job menghitung ulang jam yang menerima data dalam
-     * {@code rollup-lookback} terakhir, jadi jam yang lebih tua dari itu sudah stabil di tabel ringkasan.
-     */
+    /** Jam sebelum ini sudah stabil di ringkasan: job hanya menghitung ulang dalam {@code rollup-lookback} terakhir. */
     Instant hourlyUntil(Instant now) {
         return now.minus(properties.rollupLookback()).truncatedTo(ChronoUnit.HOURS);
     }

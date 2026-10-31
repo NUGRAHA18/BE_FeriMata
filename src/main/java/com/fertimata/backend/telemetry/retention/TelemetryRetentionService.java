@@ -6,12 +6,7 @@ import java.time.Instant;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Menghapus telemetri lama dalam batch kecil.
- *
- * <p>Setiap batch adalah transaksinya sendiri, sehingga penghapusan jutaan baris tidak pernah
- * menahan satu transaksi panjang dan ingest telemetri yang berjalan bersamaan tidak ikut tertahan.
- */
+/** Hapus telemetri lama per batch; tiap batch transaksi sendiri agar ingest tidak ikut tertahan. */
 @Service
 public class TelemetryRetentionService {
 

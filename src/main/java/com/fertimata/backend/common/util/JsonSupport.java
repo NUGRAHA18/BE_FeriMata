@@ -8,14 +8,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Thin helper around the application {@link ObjectMapper}.
- *
- * <p>Several entities persist a raw JSON document (telemetry payloads, command parameters, metadata)
- * so that the schema does not have to change every time the hardware team changes a payload. This
- * class keeps the conversion in one place and turns Jackson failures into a predictable result
- * instead of leaking parser exceptions into services.
- */
+/** Wraps the app {@link ObjectMapper} for JSON columns (payloads, parameters, metadata); Jackson errors never leak. */
 @Component
 public class JsonSupport {
 

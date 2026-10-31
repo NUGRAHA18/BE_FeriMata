@@ -7,14 +7,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Penyiraman terjadwal.
- *
- * @param enabled matikan untuk menghentikan semua jadwal tanpa menghapusnya (mis. saat komisioning)
- * @param actuatorCode pompa yang dinyalakan; kode aktuator di katalog hardware
- * @param checkInterval jeda pemeriksaan jadwal; jadwal dimulai paling lambat sebesar ini setelah jamnya
- * @param grace jadwal yang terlewat lebih lama dari ini (backend mati) tidak dikejar, dicatat MISSED
- * @param durationSource AI (bawaan, keputusan 31 Okt 2026: durasi dari fuzzy irigasi AI, isian petani = cadangan)
- *     atau MANUAL (selalu isian petani)
+ * Penyiraman terjadwal. {@code enabled=false} menghentikan jadwal tanpa menghapusnya; jadwal terlewat lebih dari {@code grace}
+ * dicatat MISSED; {@code durationSource} AI (bawaan, 31 Okt 2026, isian petani = cadangan) atau MANUAL.
  */
 @Validated
 @ConfigurationProperties(prefix = "app.irrigation")

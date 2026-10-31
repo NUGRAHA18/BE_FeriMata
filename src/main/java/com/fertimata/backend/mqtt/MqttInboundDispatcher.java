@@ -7,12 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * Single entry point for everything arriving from the broker.
- *
- * <p>Its whole job is routing: work out what a topic means, find the handler, and make sure one bad
- * message cannot take down the subscriber. Nothing here knows what a sensor or an actuator is.
- */
+/** Single entry point for broker messages: resolve topic, route to a handler, and never let one bad
+ * message take down the subscriber. Knows nothing about sensors or actuators. */
 @Component
 public class MqttInboundDispatcher {
 

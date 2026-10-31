@@ -9,14 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * Menjaga {@code sensor_reading_hourly} tetap mengikuti pembacaan mentah.
- *
- * <p>Tidak ikut dimatikan bersama retensi: ringkasan juga mempercepat grafik berbulan-bulan, dan
- * ukurannya kecil (~24 baris per sensor per hari). Urutannya terhadap job retensi tidak penting,
- * karena retensi menghapus data berumur puluhan hari sedangkan job ini meringkas data dalam hitungan
- * menit setelah diterima.
- */
+/** Menjaga {@code sensor_reading_hourly} mengikuti data mentah; tetap jalan walau retensi mati (~24 baris/sensor/hari). */
 @Component
 public class SensorReadingRollupJob {
 
@@ -52,18 +45,12 @@ public class SensorReadingRollupJob {
         log.debug("Hourly rollup refreshed {} bucket(s)", written);
     }
 
-    /**
-     * Dipisah dari {@link #run()} agar bisa diuji tanpa scheduler. Satu pernyataan SQL, jadi atomik
-     * tanpa transaksi tambahan.
-     */
+    /** Dipisah dari {@link #run()} agar bisa diuji tanpa scheduler; satu pernyataan SQL, jadi atomik. */
     public int runOnce(Instant now) {
         return queries.rollUpReceivedSince(now.minus(properties.rollupLookback()), notBefore(now));
     }
 
-    /**
-     * Jam paling tua yang masih boleh dihitung ulang. Dua jam di atas batas retensi: jam yang sedang
-     * dihapus retensi hanya tersisa sebagian, dan menghitungnya ulang akan merusak ringkasan yang utuh.
-     */
+    /** Jam tertua yang boleh dihitung ulang: batas retensi + 2 jam, karena jam yang sedang dihapus hanya tersisa sebagian. */
     Instant notBefore(Instant now) {
         if (!retention.enabled()) {
             return Instant.EPOCH;

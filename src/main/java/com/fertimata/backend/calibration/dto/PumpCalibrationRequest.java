@@ -10,10 +10,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Kalibrasi debit pompa (Protokol §8). Isi {@code trials} (dianjurkan; debit dihitung dari total
- * volume / total durasi) atau langsung {@code flowMlPerSecond} + {@code trialCount}.
- */
+/** Kalibrasi debit pompa (Protokol §8): isi {@code trials} (dianjurkan) atau {@code flowMlPerSecond} + {@code trialCount}. */
 @Schema(name = "PumpCalibrationRequest")
 public record PumpCalibrationRequest(
         @Schema(description = "Defaults to now") Instant calibratedAt,

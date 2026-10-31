@@ -3,12 +3,7 @@ package com.fertimata.backend.ai;
 import com.fertimata.backend.common.util.JsonSupport;
 import org.springframework.stereotype.Component;
 
-/**
- * Entity to DTO conversion for detections.
- *
- * <p>A separate component because the metadata column has to be parsed from JSON, which needs the
- * shared {@code ObjectMapper} - a static {@code from} method on the record could not reach it.
- */
+/** Entity to DTO for detections; a component because parsing metadata JSON needs the shared {@code ObjectMapper}. */
 @Component
 public class AiDetectionMapper {
 

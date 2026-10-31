@@ -18,14 +18,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Menyusun input fuzzy layanan AI dari bacaan sensor terbaru.
- *
- * <p>Cek data basi ada di sini, bukan di tiap klien: field yang bacaannya tidak ada atau lebih tua dari
- * {@code app.ai.inputs.max-age} bernilai null dan membuat form-nya tidak siap. Layanan AI cukup memeriksa
- * {@code readyFor…} sebelum menjalankan pompa (S9). Backend tidak menolak perintah karena ini; keputusan
- * dosing tetap milik layanan AI.
- */
+/** Menyusun input fuzzy AI dari bacaan terbaru; bacaan hilang atau lebih tua dari {@code app.ai.inputs.max-age} jadi
+ * null dan form tidak siap (S9). Backend tidak menolak perintah karena ini; keputusan dosing milik layanan AI. */
 @Service
 public class AiInputsService {
 

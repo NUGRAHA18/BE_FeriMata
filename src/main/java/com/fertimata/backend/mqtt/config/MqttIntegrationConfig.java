@@ -19,17 +19,8 @@ import org.springframework.integration.mqtt.support.MqttHeaders;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.MessageHandler;
 
-/**
- * Wires the real MQTT client.
- *
- * <p>Only created when {@code app.mqtt.enabled} is true. With it off the application starts with the
- * loopback transport instead, which is what makes the backend runnable with no broker and no
- * hardware present.
- *
- * <p>Note what this class does <em>not</em> do: it contains no topic strings (they come from
- * {@link MqttTopicResolver}) and no business logic (inbound messages go straight to
- * {@link MqttInboundDispatcher}).
- */
+/** Wires the real MQTT client, only when {@code app.mqtt.enabled}; otherwise the loopback is used.
+ * No topic strings ({@link MqttTopicResolver}) and no business logic ({@link MqttInboundDispatcher}) here. */
 @Configuration
 @ConditionalOnProperty(prefix = "app.mqtt", name = "enabled", havingValue = "true")
 public class MqttIntegrationConfig {
@@ -107,12 +98,7 @@ public class MqttIntegrationConfig {
         return adapter;
     }
 
-    /**
-     * The only bridge between the messaging library and the application.
-     *
-     * <p>It extracts the topic and the body and hands both to the dispatcher - no parsing, no
-     * persistence, no business rules.
-     */
+    /** The only bridge from the messaging library: passes topic and body to the dispatcher, nothing more. */
     @Bean
     @ServiceActivator(inputChannel = INBOUND_CHANNEL)
     public MessageHandler mqttInboundHandler(MqttInboundDispatcher dispatcher) {

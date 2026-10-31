@@ -23,13 +23,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Jadwal siram harian: diisi operator lewat aplikasi, dijalankan {@link IrrigationScheduleRunner}.
- *
- * <p>Jam disimpan dalam zona kebun ({@code app.cultivation.zone}), sama dengan HST. Lama siram dibatasi
- * {@code maxRunSeconds} pompa sejak disimpan, supaya jadwal tidak baru ketahuan salah saat pagi hari
- * ditolak aturan keselamatan.
- */
+/** Jadwal siram harian (zona {@code app.cultivation.zone}); lama dibatasi {@code maxRunSeconds} pompa sejak disimpan. */
 @Service
 public class IrrigationScheduleService {
 
@@ -121,12 +115,7 @@ public class IrrigationScheduleService {
                 .toList();
     }
 
-    /**
-     * Menandai jadwal sudah diambil untuk hari ini sebelum perintah dikirim. Kalau backend mati di tengah
-     * jalan, pemeriksaan berikutnya tidak menyiram dua kali.
-     *
-     * @return false bila jadwal sudah dihapus, dimatikan, atau sudah berjalan hari ini
-     */
+    /** Menandai jadwal diambil hari ini sebelum perintah dikirim agar restart tidak menyiram dua kali; false bila tak berlaku. */
     @Transactional
     public boolean claim(Long id, LocalDate today, Instant at) {
         Optional<IrrigationSchedule> schedule = repository.findById(id)

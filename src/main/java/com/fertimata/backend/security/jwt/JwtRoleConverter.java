@@ -7,12 +7,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
-/**
- * Memetakan klaim (<i>claim</i>) {@code roles} dari token akses ke dalam wewenang (<i>authorities</i>) Spring Security.
- *
- * <p>Tanpa pemetaan ini, pengonversi bawaan hanya akan memeriksa klaim {@code scope} OAuth2,
- * yang tidak diterbitkan oleh aplikasi ini.
- */
+/** Memetakan klaim {@code roles} ke authorities; konverter bawaan hanya membaca klaim {@code scope} OAuth2. */
 
 public class JwtRoleConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 

@@ -6,10 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/**
- * Bentuknya sama dengan {@code PushSubscription.toJSON()} di browser, jadi frontend cukup mengirim
- * hasil {@code JSON.stringify(subscription)} apa adanya. Field lain (expirationTime) diabaikan.
- */
+/** Sama dengan {@code PushSubscription.toJSON()} browser, jadi frontend kirim {@code JSON.stringify(subscription)}
+ * apa adanya; field lain (expirationTime) diabaikan. */
 @Schema(name = "PushSubscriptionRequest")
 public record PushSubscriptionRequest(
         @NotBlank @Size(max = 1024) @Schema(example = "https://fcm.googleapis.com/fcm/send/dXk...") String endpoint,

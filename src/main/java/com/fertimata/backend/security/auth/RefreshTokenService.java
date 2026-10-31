@@ -20,12 +20,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Menerbitkan, merotasi, dan mencabut refresh token.
- *
- * <p>Token akses (JWT) tetap pendek umurnya dan tidak bisa dicabut; refresh token-lah yang
- * memberi "sesi 7 hari" dan bisa dicabut kapan saja (ganti sandi, akun dinonaktifkan, logout).
- */
+/** Menerbitkan, merotasi, dan mencabut refresh token. JWT akses pendek dan tak bisa dicabut; refresh token
+ * memberi "sesi 7 hari" yang bisa dicabut (ganti sandi, akun nonaktif, logout). */
 @Service
 public class RefreshTokenService {
 
@@ -60,13 +56,8 @@ public class RefreshTokenService {
         return new Issued(raw, token.getExpiresAt());
     }
 
-    /**
-     * Memakai refresh token: yang lama dicabut, pemiliknya dikembalikan agar pemanggil menerbitkan
-     * pasangan token baru.
-     *
-     * @throws ApiException AUTHENTICATION_FAILED bila token tidak dikenal, kedaluwarsa, sudah dicabut,
-     *     atau akunnya dinonaktifkan - semuanya satu pesan, agar token yang bocor tidak bisa diraba.
-     */
+    /** Memakai refresh token: yang lama dicabut, pemiliknya dikembalikan. Semua kegagalan (tak dikenal, kedaluwarsa,
+     * dicabut, akun nonaktif) satu pesan AUTHENTICATION_FAILED agar token bocor tidak bisa diraba. */
     @Transactional
     public User rotate(String raw) {
         Instant now = Instant.now(clock);

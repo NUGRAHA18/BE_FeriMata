@@ -18,14 +18,7 @@ public interface SensorReadingRepository extends JpaRepository<SensorReading, Lo
     Page<SensorReading> findBySensorIdAndRecordedAtBetweenOrderByRecordedAtDesc(
             Long sensorId, Instant from, Instant to, Pageable pageable);
 
-    /**
-     * Latest reading of every enabled sensor, used by the dashboard.
-     *
-     * <p>Written as a subquery rather than N queries: the dashboard must stay a single round-trip
-     * regardless of how many sensors the hardware team ends up installing. Disabled sensors are
-     * excluded so that an auto-registered, not-yet-reviewed metric does not surface on the dashboard
-     * under a placeholder name - its readings are still stored.
-     */
+    /** Latest reading per enabled sensor in one query (dashboard stays one round-trip); disabled/unreviewed sensors hidden. */
     @Query(
             """
             select r from SensorReading r
@@ -60,12 +53,7 @@ public interface SensorReadingRepository extends JpaRepository<SensorReading, Lo
 
     Optional<SensorReading> findFirstByMetricKeyAndRecordedAtLessThanEqualOrderByRecordedAtDesc(String metricKey, Instant at);
 
-    /**
-     * Menghapus paling banyak {@code batchSize} pembacaan yang lebih tua dari {@code cutoff}.
-     *
-     * <p>Native SQL dengan sub-select ber-LIMIT: JPQL tidak punya LIMIT pada DELETE, dan menghapus
-     * jutaan baris dalam satu pernyataan akan mengunci tabel selama berdetik-detik.
-     */
+    /** Menghapus ≤ {@code batchSize} pembacaan sebelum {@code cutoff}; sub-select ber-LIMIT agar DELETE besar tidak mengunci tabel. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
             value =

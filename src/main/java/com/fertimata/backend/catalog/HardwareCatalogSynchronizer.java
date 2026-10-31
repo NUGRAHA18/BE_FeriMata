@@ -16,15 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Creates catalog devices, sensors and actuators that do not exist yet.
- *
- * <p><b>Create-only.</b> A row that already exists is never modified: once an operator has renamed a
- * sensor, disabled a pump or changed a run-time limit through the API, a restart must not undo it.
- * Removing something from the catalog does not delete it either - history references it.
- *
- * <p>Runs at bean initialisation rather than from a runner, for the same reason the development
- * seeder used to: inbound MQTT and the simulator start when the context refreshes, and whichever
- * arrives first would otherwise auto-register a device under a placeholder name.
+ * Creates missing catalog rows at startup. Create-only: existing rows (operator edits) are never modified or deleted.
+ * Runs at bean init so it beats MQTT/simulator auto-registering a device under a placeholder name.
  */
 @Component
 @ConditionalOnProperty(prefix = "app.catalog", name = "enabled", havingValue = "true")
@@ -110,8 +103,7 @@ public class HardwareCatalogSynchronizer {
             return false;
         }
         if (sensorRepository.findByDeviceIdAndMetricKey(device.getId(), entry.metricKey()).isPresent()) {
-            // Typically an auto-registered placeholder that arrived first. Left for the operator to
-            // review rather than silently replaced.
+            // Usually an auto-registered placeholder that arrived first; left for the operator to review.
             log.warn(
                     "Catalog sensor {} on {} not created: metric key {} is already mapped",
                     entry.code(),

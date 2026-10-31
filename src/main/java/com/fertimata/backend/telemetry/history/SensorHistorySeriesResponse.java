@@ -5,12 +5,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Riwayat satu sensor yang sudah diringkas per titik waktu, untuk grafik jangka panjang.
- *
- * <p>Nilai mentah, tanpa koreksi kalibrasi: koreksi butuh kovariat per pembacaan yang tidak tersimpan
- * di ringkasan per jam. Titik tanpa pembacaan tidak dikirim, jadi celah di grafik berarti alat mati.
- */
+/** Riwayat teragregasi untuk grafik; nilai mentah tanpa kalibrasi. Titik tanpa pembacaan tidak dikirim (celah = alat mati). */
 @Schema(name = "SensorHistorySeries")
 public record SensorHistorySeriesResponse(
         Long sensorId,

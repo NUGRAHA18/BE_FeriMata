@@ -20,10 +20,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Langganan notifikasi push. Terbuka untuk semua peran, termasuk VIEWER: menerima peringatan darurat
- * di HP tidak mengubah data kebun.
- */
+/** Langganan push, terbuka untuk semua peran termasuk VIEWER: peringatan darurat di HP tidak mengubah data kebun. */
 @RestController
 @RequestMapping("/api/push")
 @Tag(name = "Push notifications", description = "Web Push subscriptions for alert notifications")

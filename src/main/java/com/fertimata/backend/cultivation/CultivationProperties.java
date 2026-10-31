@@ -6,12 +6,8 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Pengaturan siklus tanam.
- *
- * @param zone zona waktu untuk menentukan "hari ini" saat menghitung HST; greenhouse ada di WIB
- * @param defaultPhases template fase yang dipakai saat siklus baru dibuat tanpa fase. Angka-angkanya
- *     dari Arsitektur-Sistem.md §12; batas HST-nya placeholder sampai tim agronomi menetapkannya,
- *     dan operator bisa mengubahnya lewat API/UI kapan saja.
+ * {@code zone}: zona "hari ini" untuk HST (WIB). {@code defaultPhases}: template fase siklus baru (Arsitektur-Sistem.md §12);
+ * batas HST placeholder sampai ditetapkan tim agronomi, bisa diubah operator.
  */
 @ConfigurationProperties(prefix = "app.cultivation")
 public record CultivationProperties(ZoneId zone, List<PhaseTemplate> defaultPhases) {

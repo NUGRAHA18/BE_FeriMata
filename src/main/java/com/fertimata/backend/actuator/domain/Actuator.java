@@ -16,13 +16,8 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * Something on a device that can be commanded.
- *
- * <p>Pumps, valves and fans are values of {@link #type}, not subclasses and not tables. The backend
- * never learns how an actuator is wired; it only knows the actuator exists and what state the
- * device last reported for it.
- */
+/** Something on a device that can be commanded; pump/valve/fan are values of {@link #type}, not subclasses.
+ * The backend never knows the wiring, only that it exists and its last reported state. */
 @Entity
 @Table(
         name = "actuator",
@@ -50,37 +45,23 @@ public class Actuator extends AuditedEntity {
     @Column(nullable = false)
     private boolean enabled = true;
 
-    /**
-     * Last state reported by the device, for example {@code ON} or {@code OFF}.
-     *
-     * <p>Free text because the state vocabulary is a hardware decision. This is a reported value,
-     * never an assumed one: issuing a command does not change it, an acknowledgement does.
-     */
+    /** Last device-reported state (e.g. {@code ON}), hardware-owned free text; a command never changes it, an ACK does. */
     @Column(name = "current_state", length = 32)
     private String currentState;
 
     @Column(name = "state_updated_at")
     private Instant stateUpdatedAt;
 
-    /**
-     * Longest run one activating command may request, in seconds. Null means no software limit.
-     *
-     * <p>Data rather than a constant, because it depends on calibration (pump flow, rail length) the
-     * operator owns. It is a second line of defence: the hardware design keeps a mechanical timer
-     * relay in series with the pumps that no software bug can bypass.
-     */
+    /** Max run of one activating command, in seconds; null = no software limit. Data, not a constant, because it
+     * depends on operator calibration (pump flow, rail length); a second line of defence. */
     @Column(name = "max_run_seconds")
     private Integer maxRunSeconds;
 
     @Column(length = 255)
     private String description;
 
-    /**
-     * Informational hardware binding, for example {@code {"modbusAddress": 21, "channel": "R0"}}.
-     *
-     * <p>Shown to operators only. The edge agent's own address map stays the source of truth for
-     * wiring; the backend never reads this to decide anything.
-     */
+    /** Informational binding, e.g. {@code {"modbusAddress": 21, "channel": "R0"}}, shown to operators only.
+     * The edge agent's address map stays the source of truth; the backend never decides on this. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String metadata;

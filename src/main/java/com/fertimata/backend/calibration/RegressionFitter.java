@@ -7,13 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
 
-/**
- * Regresi kuadrat terkecil biasa untuk koreksi sensor terhadap lab (Protokol-Data.md §7 langkah 3-4).
- *
- * <p>Sengaja kecil: paling banyak beberapa prediktor (nilai mentah + kelembapan + suhu) dan puluhan
- * sampel, jadi persamaan normal yang diselesaikan dengan eliminasi Gauss sudah cukup. Tim tetap bebas
- * menghitung model di perangkat lunak statistik dan memasukkan koefisiennya langsung.
- */
+/** OLS koreksi sensor vs lab (Protokol-Data.md §7 langkah 3-4); prediktor sedikit, jadi eliminasi Gauss cukup. */
 public final class RegressionFitter {
 
     private static final double SINGULAR_EPSILON = 1e-12;
@@ -23,11 +17,7 @@ public final class RegressionFitter {
     /** Satu sampel: nilai mentah sensor, nilai lab, dan nilai kovariat (metricKey -> nilai). */
     public record Point(double raw, double lab, Map<String, Double> covariates) {}
 
-    /**
-     * @param bias Bland-Altman: rata-rata (prediksi − lab)
-     * @param loaLower batas bawah kesesuaian, bias − 1,96 SD
-     * @param loaUpper batas atas kesesuaian, bias + 1,96 SD
-     */
+    /** Statistik kesesuaian; Bland-Altman: bias = rata-rata (prediksi − lab), batas kesesuaian = bias ± 1,96 SD. */
     public record Fit(
             CalibrationModel model,
             int sampleCount,

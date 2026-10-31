@@ -18,13 +18,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Satu musim tanam.
- *
- * <p>Semua yang bergantung pada umur tanaman (HST, fase pertumbuhan, target EC, rasio N:P:K)
- * diturunkan dari {@link #sowingDate}. Fase-fasenya adalah data milik siklus ini, bukan
- * konstanta: batas hari dan angka agronominya boleh berbeda antar musim.
- */
+/** Satu musim tanam; HST, fase, dan target diturunkan dari {@link #sowingDate}. Fase milik siklus, boleh beda antar musim. */
 @Entity
 @Table(name = "planting_cycle")
 @Getter

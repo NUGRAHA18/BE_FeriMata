@@ -35,14 +35,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * End-to-end checks against a real PostgreSQL instance.
- *
- * <p>Tagged {@code integration} and excluded from the default build, because it needs Docker. Run it
- * with {@code ./mvnw test -Dgroups=integration}.
- *
- * <p>What it is really for: the Flyway migration and the JPA entities are two descriptions of the
- * same schema, and only a real database can prove they agree. {@code ddl-auto=validate} in the test
- * profile turns any drift between them into a failure here rather than a surprise in production.
+ * End-to-end against real PostgreSQL (tag {@code integration}, needs Docker: {@code ./mvnw test -Dgroups=integration}).
+ * {@code ddl-auto=validate} proves the Flyway migrations and JPA entities agree.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -161,9 +155,7 @@ class FertiMataIntegrationTest {
                 .getResponse()
                 .getContentAsString());
 
-        // Ingestion is driven through the service rather than the development endpoint, because
-        // that endpoint only exists under the dev profile. This is the same code path the MQTT
-        // handler calls.
+        // Through the service, not the dev-only endpoint: the same code path the MQTT handler calls.
         TelemetryIngestResult ingest = telemetryIngestService.ingest(
                 "IT-DEVICE-1", Instant.now(), Map.of("temperature", new BigDecimal("28.4")), TelemetrySource.MQTT);
         assertThat(ingest.status()).isEqualTo(TelemetryStatus.ACCEPTED);

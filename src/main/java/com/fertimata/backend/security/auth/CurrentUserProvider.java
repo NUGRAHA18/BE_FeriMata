@@ -10,12 +10,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
-/**
- * Reads the authenticated account out of the security context.
- *
- * <p>Services use this instead of taking a user id from the request body: a client must never be
- * able to claim it acted on behalf of somebody else.
- */
+/** Reads the authenticated account from the security context; never trust a user id from the request body. */
 @Component
 public class CurrentUserProvider {
 

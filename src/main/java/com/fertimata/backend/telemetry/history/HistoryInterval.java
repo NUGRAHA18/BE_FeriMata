@@ -6,13 +6,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Lebar titik grafik yang boleh diminta.
- *
- * <p>Daftar tetap, bukan durasi bebas: setiap lebar mulai 1 jam adalah kelipatan jam, sehingga titik
- * di luar masa retensi bisa disusun tepat dari {@code sensor_reading_hourly}. Lebar di bawah 1 jam
- * hanya bisa dihitung dari pembacaan mentah.
- */
+/** Lebar titik grafik yang boleh diminta; lebar ≥ 1 jam kelipatan jam agar bisa disusun dari {@code sensor_reading_hourly}. */
 public enum HistoryInterval {
     MINUTE_1("1m", Duration.ofMinutes(1)),
     MINUTE_5("5m", Duration.ofMinutes(5)),

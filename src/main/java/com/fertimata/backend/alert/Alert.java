@@ -20,13 +20,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * Something an operator should look at.
- *
- * <p>Only infrastructure-level alerts are produced in this phase (a device going quiet, a command
- * failing). Agronomic alerts need thresholds the team has not agreed on; the domain is ready for
- * them, the rules are not written.
- */
+/** Something an operator should look at. Infrastructure alerts only for now: agronomic thresholds are undecided. */
 @Entity
 @Table(name = "alert")
 @Getter

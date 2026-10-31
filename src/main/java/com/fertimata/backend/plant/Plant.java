@@ -8,13 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Satu tanaman di greenhouse, ditambahkan petani supaya tampil di dashboard.
- *
- * <p>Sejak 29 Okt 2026 aplikasi difokuskan ke kontrol: atribut riset (perlakuan, blok, siklus,
- * pengamatan, panen) dihapus (migrasi V14). Umur dan fase berlaku untuk seluruh greenhouse dan dihitung
- * dari tanggal tanam pindah, bukan per tanaman.
- */
+/** Tanaman di greenhouse untuk dashboard. Atribut riset dihapus (V14); umur/fase berlaku per greenhouse, bukan per tanaman. */
 @Entity
 @Table(name = "plant")
 @Getter

@@ -31,11 +31,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Debit pompa peristaltik dan volume larutan yang dikeluarkan (Protokol-Data.md §6, §8).
- *
- * <p>Volume = durasi perintah yang di-ACK EXECUTED × debit kalibrasi terakhir sebelum perintah itu
- * dijalankan. Backend tidak tahu apakah pompa benar-benar memompa (selang bisa kosong); ini volume
- * nominal, sama seperti yang ditulis Protokol §6 "log durasi pompa × debit terkalibrasi".
+ * Debit pompa dan volume larutan (Protokol-Data.md §6, §8): durasi perintah ACK EXECUTED × debit kalibrasi terakhir
+ * sebelum perintah. Volume nominal: backend tidak tahu apakah selang benar-benar berisi.
  */
 @Service
 public class PumpCalibrationService {

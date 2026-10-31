@@ -3,15 +3,7 @@ package com.fertimata.backend.cultivation.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 
-/**
- * Keadaan siklus aktif "hari ini": apa yang perlu diketahui dashboard dan (nanti) fuzzy dosing.
- *
- * @param hst hari setelah semai; 0 pada hari semai
- * @param currentPhase null bila HST di luar semua fase yang didefinisikan
- * @param nextPhase fase berikutnya, bila ada
- * @param daysUntilNextPhase null bila tidak ada fase berikutnya
- * @param plantCount semua tanaman aktif
- */
+/** Siklus aktif hari ini (HST 0 = hari semai); field fase null bila HST di luar fase atau tidak ada fase berikutnya. */
 @Schema(name = "CycleStatus")
 public record CycleStatusResponse(
         PlantingCycleResponse cycle,

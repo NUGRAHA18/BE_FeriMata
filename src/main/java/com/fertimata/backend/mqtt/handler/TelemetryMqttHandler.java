@@ -11,13 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * Deserialises a telemetry message and hands it to the ingestion service.
- *
- * <p>That is the whole job. Device resolution, metric mapping, validation and persistence all belong
- * to {@link TelemetryIngestService}, so the same logic runs whether the message came from the
- * broker, the simulator or the development endpoint.
- */
+/** Deserialises telemetry and hands it to {@link TelemetryIngestService}, which owns all logic so broker,
+ * simulator and dev endpoint behave the same. */
 @Component
 public class TelemetryMqttHandler implements MqttMessageHandler {
 

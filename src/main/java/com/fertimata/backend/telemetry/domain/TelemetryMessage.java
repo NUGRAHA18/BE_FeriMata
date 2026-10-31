@@ -17,17 +17,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * The envelope of one inbound telemetry message, stored verbatim.
- *
- * <p>This is half of the telemetry model. The raw {@code payload} is kept so that a message can be
- * inspected or replayed after the fact - which matters while the payload contract is still moving -
- * and the individual metrics are additionally normalised into {@link SensorReading} rows so that
- * history queries stay cheap.
- *
- * <p>A message is recorded even when it is rejected: a payload the backend could not understand is
- * exactly the payload someone will need to look at.
- */
+/** Verbatim telemetry envelope, kept for inspection/replay even when rejected; metrics are normalised into {@link SensorReading}. */
 @Entity
 @Table(name = "telemetry_message")
 @Getter

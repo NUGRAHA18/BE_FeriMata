@@ -5,13 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Format error tunggal yang dipakai semua endpoint.
- *
- * <p>
- * Tanpa stack trace: {@code message} cuma ringkasan aman yang gampang dibaca,
- * {@code details} khusus nampung info error validasi di tingkat field.
- */
+/** Format error tunggal semua endpoint: tanpa stack trace; {@code details} untuk error validasi per field. */
 
 @Schema(name = "ApiError", description = "Standard error response")
 @JsonInclude(JsonInclude.Include.NON_EMPTY)

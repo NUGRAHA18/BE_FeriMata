@@ -21,7 +21,6 @@ import lombok.Setter;
 @NoArgsConstructor
 public class IrrigationSchedule extends AuditedEntity {
 
-    /** Hasil putaran terakhir. */
     public enum RunResult {
         /** Perintah siram terkirim ke pompa. */
         STARTED,

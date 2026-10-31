@@ -1,8 +1,4 @@
 package com.fertimata.backend.alert;
 
-/**
- * Peringatan baru sudah dibuat. Diterbitkan di dalam transaksi pembuatnya; pendengar yang menghubungi
- * dunia luar (notifikasi push) memakai {@code @TransactionalEventListener} agar hanya bereaksi setelah
- * peringatan benar-benar tersimpan.
- */
+/** Alert baru tersimpan. Pendengar ke luar (push) memakai {@code @TransactionalEventListener} agar jalan setelah commit. */
 public record AlertRaisedEvent(AlertResponse alert) {}

@@ -22,12 +22,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Device registry and liveness bookkeeping.
- *
- * <p>Device state is <em>observed</em>, never assumed: a device becomes ONLINE because something was
- * heard from it, and OFFLINE because nothing has been for longer than the configured timeout.
- */
+/** Device registry and liveness: ONLINE when heard from, OFFLINE after the configured timeout. Observed, never assumed. */
 @Service
 public class DeviceService {
 
@@ -116,13 +111,7 @@ public class DeviceService {
         return deviceRepository.findByDeviceCode(deviceCode);
     }
 
-    /**
-     * Resolves the device an inbound message claims to come from.
-     *
-     * <p>When the code is unknown the behaviour is a policy decision, not a guess: with
-     * {@code app.device.auto-register} on, a placeholder device is created so the data is not lost;
-     * with it off, the message is reported as coming from an unknown device and the caller decides.
-     */
+    /** Resolves a message's device. Unknown code: placeholder when {@code app.device.auto-register}, else reported unknown. */
     @Transactional
     public Optional<Device> resolveForIngest(String deviceCode) {
         Optional<Device> existing = deviceRepository.findByDeviceCode(deviceCode);
@@ -140,12 +129,7 @@ public class DeviceService {
         return Optional.of(saved);
     }
 
-    /**
-     * Records that something was heard from a device.
-     *
-     * <p>Called for every inbound message, not only heartbeats: telemetry is just as good a proof of
-     * life as a dedicated heartbeat, and relying only on heartbeats would flap a busy device offline.
-     */
+    /** Records contact on every inbound message, not just heartbeats, so a busy device does not flap offline. */
     @Transactional
     public void recordContact(Device device, Instant seenAt, Map<String, Object> metadata) {
         DeviceStatus previous = device.getStatus();
@@ -168,12 +152,7 @@ public class DeviceService {
         }
     }
 
-    /**
-     * Records the power source a device reported.
-     *
-     * <p>Only a change is news: it raises one alert and one status event. A device that keeps
-     * reporting {@code BATTERY} every heartbeat refreshes the timestamp without flooding operators.
-     */
+    /** Records the reported power source; only a change raises an alert/event, repeats just refresh the timestamp. */
     @Transactional
     public void reportPowerSource(Device device, String reportedSource, Instant reportedAt) {
         String source = PowerProperties.normalise(reportedSource);
@@ -210,12 +189,7 @@ public class DeviceService {
         }
     }
 
-    /**
-     * Whether any device currently reports a power source other than a normal supply.
-     *
-     * <p>Liveness is deliberately ignored: a device that went quiet after reporting {@code BATTERY}
-     * has not told us power came back, and an interlock must not relax on silence.
-     */
+    /** Whether any device reports a non-normal power source. Ignores liveness: an interlock must not relax on silence. */
     @Transactional(readOnly = true)
     public List<Device> devicesOnBackupPower() {
         return deviceRepository.findByPowerSourceIsNotNull().stream()
@@ -223,13 +197,7 @@ public class DeviceService {
                 .toList();
     }
 
-    /**
-     * Flips a device to OFFLINE and raises one alert per outage.
-     *
-     * <p>The liveness monitor passes a copy loaded by {@link #findStaleDevices}, whose transaction has
-     * already ended, so changing that copy would never reach the database. The row is reloaded here and
-     * checked again, because the device may have reported in since it was found stale.
-     */
+    /** Flips to OFFLINE with one alert per outage; reloads the row (caller's copy is detached) and rechecks staleness. */
     @Transactional
     public void markOffline(Device stale) {
         Device device = deviceRepository.findById(stale.getId()).orElse(null);

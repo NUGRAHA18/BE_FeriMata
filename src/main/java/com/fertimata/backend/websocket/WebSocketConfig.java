@@ -8,13 +8,8 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
-/**
- * STOMP-over-WebSocket setup for dashboard push.
- *
- * <p>The simple in-memory broker is enough for one backend instance. Running more than one instance
- * would need a real broker relay so that an event ingested by instance A reaches a client connected
- * to instance B - noted in docs/architecture.md as a scaling decision for later.
- */
+/** STOMP-over-WebSocket with the in-memory broker, enough for one instance; scaling out needs a broker relay
+ * (see docs/architecture.md). */
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {

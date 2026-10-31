@@ -12,13 +12,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Bikin akun operator pertama supaya deployment baru bisa dipakai buat sign in.
- *
- * <p>Fungsi ini cuma jalan pas tabel user masih kosong, jadi gak bakal pernah numpuk password yang
- * udah diubah sama operator. Selain itu, fungsi ini bakal nolak jalan kalo gak ada password yang
- * diset lewat environment variable.
- */
+/** Membuat operator pertama hanya saat tabel user kosong (tidak menimpa sandi yang sudah diubah);
+ * menolak jalan bila sandi tidak diset lewat environment. */
 
 @Component
 @ConditionalOnProperty(prefix = "app.bootstrap", name = "enabled", havingValue = "true")

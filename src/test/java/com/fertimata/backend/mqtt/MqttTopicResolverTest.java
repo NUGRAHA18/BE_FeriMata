@@ -9,10 +9,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * The topic convention is not final, so the one class that owns topic strings is worth testing
- * carefully - especially the case where one template is a prefix of another.
- */
+/** The topic convention is not final; covers the case where one template is a prefix of another. */
 class MqttTopicResolverTest {
 
     private static final Map<TopicKind, String> TEMPLATES = new EnumMap<>(Map.of(

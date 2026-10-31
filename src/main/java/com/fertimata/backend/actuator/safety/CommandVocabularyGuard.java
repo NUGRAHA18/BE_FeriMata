@@ -9,13 +9,8 @@ import java.util.Optional;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * Refuses command names and parameters the actuator's type does not accept.
- *
- * <p>Runs first and for every command, stops included: a malformed request is a 400 whatever the
- * plant state. Without it a typo such as {@code GOTO} instead of {@code GOTO_STATION} would only
- * come back seconds later as an {@code UNSUPPORTED} acknowledgement from the edge agent.
- */
+/** Refuses command names/parameters the actuator type does not accept. Runs first, stops included (400), so a
+ * typo like {@code GOTO} fails now instead of as a later {@code UNSUPPORTED} ACK from the edge. */
 @Component
 @Order(5)
 public class CommandVocabularyGuard implements CommandGuard {

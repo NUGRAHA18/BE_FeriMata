@@ -9,10 +9,7 @@ import java.security.interfaces.ECPublicKey;
 import java.time.Duration;
 import java.time.Instant;
 
-/**
- * Header {@code Authorization: vapid} (RFC 8292) yang membuktikan ke server push bahwa notifikasi
- * berasal dari pemilik kunci yang dipakai browser saat berlangganan.
- */
+/** Header {@code Authorization: vapid} (RFC 8292): bukti ke server push bahwa pengirim memegang kunci langganan. */
 final class VapidSigner {
 
     /** RFC 8292 membatasi exp paling lama 24 jam; 12 jam memberi ruang untuk jam yang tidak sinkron. */

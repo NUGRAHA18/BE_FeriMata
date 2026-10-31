@@ -18,18 +18,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * DEVELOPMENT ONLY. Produces sample telemetry so the dashboard is alive without hardware.
- *
- * <p>It feeds messages into {@link MqttInboundDispatcher} on a real topic rather than calling the
- * ingestion service directly. That way the simulated path exercises the same topic parsing, handler
- * routing, validation and WebSocket push that a real device will, and the frontend developer is
- * looking at the production pipeline rather than at a shortcut.
- *
- * <p>Every configured device gets a heartbeat, including devices without metrics, so that relay
- * modules show ONLINE and accept commands the way they will once the edge agent polls them.
- *
- * <p>Values are random inside configured ranges. They are placeholders for rendering, not plausible
- * agronomic readings, and nothing in the backend interprets them.
+ * DEVELOPMENT ONLY. Feeds random in-range placeholder telemetry through {@link MqttInboundDispatcher} on real topics so
+ * the full pipeline runs; every device also heartbeats so relay modules show ONLINE.
  */
 @Component
 @Profile("dev")

@@ -19,13 +19,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Stores and serves results produced by the vision model on the edge device.
- *
- * <p>The backend is a consumer here, not a participant: it runs no model, applies no threshold to a
- * confidence score and knows no disease vocabulary. Interpreting a detection is the AI team's
- * contract, and inventing rules for it now would bake in claims nobody has validated.
- */
+/** Stores and serves edge vision results; runs no model, applies no confidence threshold and knows no disease
+ * vocabulary, since interpreting detections is the AI team's contract. */
 @Service
 public class AiDetectionService {
 
@@ -53,12 +48,8 @@ public class AiDetectionService {
         this.jsonSupport = jsonSupport;
     }
 
-    /**
-     * Records a detection reported by a device.
-     *
-     * @param deviceCode taken from the topic, not the payload
-     * @return empty when the device is unknown and auto-registration is off
-     */
+    /** Records a device detection; {@code deviceCode} comes from the topic. Empty when the device is unknown and
+     * auto-registration is off. */
     @Transactional
     public Optional<AiDetectionResponse> record(String deviceCode, AiDetectionPayload payload) {
         boolean hasLabel = payload != null && payload.label() != null && !payload.label().isBlank();
@@ -148,12 +139,7 @@ public class AiDetectionService {
         return value.length() <= max ? value : value.substring(0, max);
     }
 
-    /**
-     * Resolves an optional plant reference.
-     *
-     * <p>An unknown plant code is not an error and does not create a plant: whether cultivation is
-     * tracked per plant at all is still an open question, so a detection simply stays unattached.
-     */
+    /** Resolves an optional plant; an unknown code neither errors nor creates a plant (per-plant tracking is undecided). */
     private Plant resolvePlant(String plantCode) {
         if (plantCode == null || plantCode.isBlank()) {
             return null;

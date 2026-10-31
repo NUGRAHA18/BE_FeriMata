@@ -39,11 +39,7 @@ import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * The shipped catalog is configuration that controls real pumps, so it is loaded and bound exactly
- * the way Spring will bind it, and checked for the mistakes that would otherwise only show at startup
- * on the Jetson: duplicate codes, duplicate metric keys, lost metadata case, unbound interlock lists.
- */
+/** Loads the shipped catalog (it drives real pumps) exactly as Spring binds it and checks for mistakes that only show at startup. */
 class HardwareCatalogTest {
 
     private static Binder binder;
