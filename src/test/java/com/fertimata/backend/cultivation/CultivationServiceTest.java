@@ -64,10 +64,10 @@ class CultivationServiceTest {
     }
 
     @Test
-    @DisplayName("HST counts days since transplant in WIB, and today's phase comes from the HST")
+    @DisplayName("HST counts days since sowing in WIB, and today's phase comes from the HST")
     void hstAndPhaseToday() {
         when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.empty());
-        CycleStatusResponse created = service.setTransplantDate(LocalDate.of(2026, 9, 12));
+        CycleStatusResponse created = service.setSowingDate(LocalDate.of(2026, 9, 12));
         when(plantRepository.countByActiveTrue()).thenReturn(5L);
 
         assertThat(created.today()).isEqualTo(LocalDate.of(2026, 10, 20));
@@ -79,11 +79,11 @@ class CultivationServiceTest {
     }
 
     @Test
-    @DisplayName("setting the transplant date creates the greenhouse cycle with the template phases when none exists")
-    void transplantDateCreatesCycle() {
+    @DisplayName("setting the sowing date creates the greenhouse cycle with the template phases when none exists")
+    void sowingDateCreatesCycle() {
         when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.empty());
 
-        CycleStatusResponse status = service.setTransplantDate(LocalDate.of(2026, 9, 12));
+        CycleStatusResponse status = service.setSowingDate(LocalDate.of(2026, 9, 12));
 
         assertThat(status.cycle().code()).isEqualTo("MT-2026-09-12");
         assertThat(status.cycle().status()).isEqualTo(CycleStatus.ACTIVE);
@@ -92,37 +92,37 @@ class CultivationServiceTest {
     }
 
     @Test
-    @DisplayName("setting the transplant date again moves the existing cycle instead of starting a new one")
-    void transplantDateUpdatesActiveCycle() {
+    @DisplayName("setting the sowing date again moves the existing cycle instead of starting a new one")
+    void sowingDateUpdatesActiveCycle() {
         PlantingCycle active = new PlantingCycle("MT-2026-09-12", "Musim", LocalDate.of(2026, 9, 12));
         TestFixtures.setId(active, 1L);
         active.setStatus(CycleStatus.ACTIVE);
         active.replacePhases(List.of(phase("VEGETATIF", 8, 24), phase("PEMBUNGAAN", 25, 34)));
         when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.of(active));
 
-        CycleStatusResponse status = service.setTransplantDate(LocalDate.of(2026, 10, 1));
+        CycleStatusResponse status = service.setSowingDate(LocalDate.of(2026, 10, 1));
 
-        assertThat(status.cycle().transplantDate()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(status.cycle().sowingDate()).isEqualTo(LocalDate.of(2026, 10, 1));
         assertThat(status.hst()).isEqualTo(19);
         assertThat(status.currentPhase().code()).isEqualTo("VEGETATIF");
         verify(cycleRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("resetting the transplant date ends the active cycle; the next date starts a new one")
+    @DisplayName("resetting the sowing date ends the active cycle; the next date starts a new one")
     void resetEndsActiveCycle() {
         PlantingCycle active = new PlantingCycle("MT-2026-09-12", "Musim", LocalDate.of(2026, 9, 12));
         active.setStatus(CycleStatus.ACTIVE);
         when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.of(active));
 
-        assertThat(service.resetTransplantDate()).isTrue();
+        assertThat(service.resetSowingDate()).isTrue();
         assertThat(active.getStatus()).isEqualTo(CycleStatus.ENDED);
         assertThat(active.getEndedAt()).isEqualTo(LocalDate.of(2026, 10, 20));
     }
 
     @Test
-    @DisplayName("without a transplant date there is no status")
-    void noTransplantDate() {
+    @DisplayName("without a sowing date there is no status")
+    void noSowingDate() {
         when(cycleRepository.findFirstByStatus(CycleStatus.ACTIVE)).thenReturn(Optional.empty());
 
         assertThat(service.activeStatus()).isEmpty();

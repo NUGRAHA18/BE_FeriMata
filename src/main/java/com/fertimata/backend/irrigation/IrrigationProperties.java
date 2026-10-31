@@ -13,8 +13,19 @@ import org.springframework.validation.annotation.Validated;
  * @param actuatorCode pompa yang dinyalakan; kode aktuator di katalog hardware
  * @param checkInterval jeda pemeriksaan jadwal; jadwal dimulai paling lambat sebesar ini setelah jamnya
  * @param grace jadwal yang terlewat lebih lama dari ini (backend mati) tidak dikejar, dicatat MISSED
+ * @param durationSource AI (bawaan, keputusan 31 Okt 2026: durasi dari fuzzy irigasi AI, isian petani = cadangan)
+ *     atau MANUAL (selalu isian petani)
  */
 @Validated
 @ConfigurationProperties(prefix = "app.irrigation")
 public record IrrigationProperties(
-        boolean enabled, @NotBlank String actuatorCode, @NotNull Duration checkInterval, @NotNull Duration grace) {}
+        boolean enabled,
+        @NotBlank String actuatorCode,
+        @NotNull Duration checkInterval,
+        @NotNull Duration grace,
+        IrrigationDurationResolver.Source durationSource) {
+
+    public IrrigationProperties {
+        durationSource = durationSource == null ? IrrigationDurationResolver.Source.AI : durationSource;
+    }
+}

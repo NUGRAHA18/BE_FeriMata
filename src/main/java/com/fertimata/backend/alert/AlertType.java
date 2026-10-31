@@ -31,6 +31,9 @@ public final class AlertType {
     /** Jadwal siram tidak dijalankan: ditolak aturan keselamatan atau pompa tidak tersedia. */
     public static final String IRRIGATION_SKIPPED = "IRRIGATION_SKIPPED";
 
+    /** Durasi siram dari fuzzy AI tidak bisa dipakai; jadwal berjalan dengan durasi cadangan petani. */
+    public static final String IRRIGATION_AI_FALLBACK = "IRRIGATION_AI_FALLBACK";
+
     /** A sensor in the drift-check list has not been checked against a standard solution recently. */
     public static final String DRIFT_CHECK_DUE = "DRIFT_CHECK_DUE";
 

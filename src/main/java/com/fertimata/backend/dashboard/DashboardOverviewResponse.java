@@ -31,7 +31,7 @@ public record DashboardOverviewResponse(
     /**
      * Siklus tanam aktif hari ini: umur tanaman dan target fase, untuk kartu Beranda dan fuzzy dosing.
      *
-     * @param hst hari setelah transplant
+     * @param hst hari setelah semai
      * @param currentPhase null bila HST di luar fase yang didefinisikan
      */
     @Schema(name = "DashboardCultivationSection")
@@ -39,7 +39,8 @@ public record DashboardOverviewResponse(
             Long cycleId,
             String cycleCode,
             String cycleName,
-            LocalDate transplantDate,
+            LocalDate sowingDate,
+            @Deprecated @Schema(description = "Deprecated alias of sowingDate", deprecated = true) LocalDate transplantDate,
             long hst,
             GrowthPhaseResponse currentPhase,
             GrowthPhaseResponse nextPhase,

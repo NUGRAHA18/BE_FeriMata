@@ -77,7 +77,7 @@ public class PlantService {
         plantRepository.flush();
         log.info("Plant {} deleted ({} AI detection(s) detached)", plant.getCode(), detached);
         if (plantRepository.count() == 0) {
-            cultivationService.resetTransplantDate();
+            cultivationService.resetSowingDate();
         }
     }
 

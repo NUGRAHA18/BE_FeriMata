@@ -102,7 +102,7 @@ public class AiInputsService {
         });
         values.put(HST, hst == null ? null : BigDecimal.valueOf(hst));
         if (hst == null) {
-            problems.add("%s.hst: transplant date is not set".formatted(formName));
+            problems.add("%s.hst: sowing date is not set".formatted(formName));
         }
         return values;
     }

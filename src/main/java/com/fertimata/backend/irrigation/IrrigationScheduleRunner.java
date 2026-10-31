@@ -34,6 +34,9 @@ import org.springframework.stereotype.Component;
  * (PLN padam, air drum habis, pompa pupuk sedang jalan) tidak diulang; operator diberi peringatan.
  * Jadwal yang terlewat karena backend mati lebih lama dari {@code grace} juga tidak dikejar: siram siang
  * bolong untuk jadwal pagi bisa lebih merugikan daripada melewatkannya.
+ *
+ * <p>Durasinya ditentukan {@link IrrigationDurationResolver}: fuzzy irigasi AI, dengan durasi jadwal sebagai
+ * cadangan. AI menjawab 0 detik = tidak siram hari itu (SKIPPED, {@code AI_NO_WATER_NEEDED}, tanpa peringatan).
  */
 @Component
 public class IrrigationScheduleRunner {
@@ -47,6 +50,7 @@ public class IrrigationScheduleRunner {
     private final ActuatorCommandService commandService;
     private final AlertService alertService;
     private final IrrigationProperties properties;
+    private final IrrigationDurationResolver durations;
     private final Clock clock;
 
     public IrrigationScheduleRunner(
@@ -54,17 +58,20 @@ public class IrrigationScheduleRunner {
             ActuatorCommandService commandService,
             AlertService alertService,
             IrrigationProperties properties,
+            IrrigationDurationResolver durations,
             Clock clock) {
         this.schedules = schedules;
         this.commandService = commandService;
         this.alertService = alertService;
         this.properties = properties;
+        this.durations = durations;
         this.clock = clock;
         log.info(
-                "Scheduled irrigation {} (pump {}, checked every {})",
+                "Scheduled irrigation {} (pump {}, checked every {}, duration from {})",
                 properties.enabled() ? "active" : "switched off",
                 properties.actuatorCode(),
-                properties.checkInterval());
+                properties.checkInterval(),
+                properties.durationSource());
     }
 
     @Scheduled(
@@ -105,17 +112,45 @@ public class IrrigationScheduleRunner {
                     "Pompa siram %s tidak ditemukan atau dimatikan.".formatted(properties.actuatorCode()), null);
             return;
         }
+        IrrigationDurationResolver.Decision duration =
+                durations.resolve(due.durationSeconds(), pump.get().getMaxRunSeconds());
+        if (duration.skip()) {
+            schedules.record(due.id(), today, now, IrrigationSchedule.RunResult.SKIPPED, duration.reasonCode(),
+                    "AI: tidak perlu siram (%s).".formatted(duration.detail()), null, 0, duration.source());
+            log.info("Scheduled irrigation {} skipped: the AI fuzzy irrigation says no water is needed", at);
+            return;
+        }
+        if (duration.source() == IrrigationDurationResolver.Source.FALLBACK) {
+            warnFallback(due, at, duration);
+        }
         try {
             ActuatorCommandResponse command = commandService.issueSystemCommand(
                     pump.get().getId(),
-                    new ActuatorCommandRequest("ON", Map.of("durationSeconds", due.durationSeconds())));
-            schedules.record(due.id(), today, now, IrrigationSchedule.RunResult.STARTED, null, null, command.commandUid());
-            log.info("Scheduled irrigation {} started for {} s ({})", at, due.durationSeconds(), command.commandUid());
+                    new ActuatorCommandRequest("ON", Map.of("durationSeconds", duration.seconds())));
+            schedules.record(due.id(), today, now, IrrigationSchedule.RunResult.STARTED, duration.reasonCode(),
+                    duration.detail(), command.commandUid(), duration.seconds(), duration.source());
+            log.info("Scheduled irrigation {} started for {} s from {} ({})",
+                    at, duration.seconds(), duration.source(), command.commandUid());
         } catch (SafetyInterlockException ex) {
             fail(due, today, now, IrrigationSchedule.RunResult.SKIPPED, reasonCode(ex), ex.getMessage(), ex);
         } catch (ApiException ex) {
             fail(due, today, now, IrrigationSchedule.RunResult.FAILED, reasonCode(ex), ex.getMessage(), ex);
         }
+    }
+
+    private void warnFallback(IrrigationScheduleService.Due due, String at, IrrigationDurationResolver.Decision duration) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("scheduleId", due.id());
+        metadata.put("time", at);
+        metadata.put("reasonCode", duration.reasonCode());
+        metadata.put("durationSeconds", duration.seconds());
+        alertService.raise(NewAlert.builder(AlertType.IRRIGATION_AI_FALLBACK, AlertSeverity.INFO)
+                .title("Irrigation used the fallback duration")
+                .message("The AI fuzzy irrigation could not be used at %s (%s: %s); watering for the schedule's %d s instead"
+                        .formatted(at, duration.reasonCode(), duration.detail(), duration.seconds()))
+                .source(AlertSource.SYSTEM)
+                .metadata(metadata)
+                .build());
     }
 
     /** Kode interlock bila ada (mis. BACKUP_POWER, FLOAT_LOW), selain itu kode error API. */

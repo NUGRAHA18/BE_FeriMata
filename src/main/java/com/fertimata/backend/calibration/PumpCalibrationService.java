@@ -96,7 +96,7 @@ public class PumpCalibrationService {
             throw new BusinessRuleException(
                     "Actuator %s (%s) is not a calibrated pump; calibrated types are %s"
                             .formatted(actuator.getCode(), actuator.getType(), properties.pump().types()),
-                    Map.of("type", String.valueOf(actuator.getType())));
+                    Map.of("reason", "NOT_CALIBRATABLE_PUMP", "type", String.valueOf(actuator.getType())));
         }
         Instant calibratedAt = request.calibratedAt() == null ? clock.instant() : request.calibratedAt();
 
@@ -109,7 +109,7 @@ public class PumpCalibrationService {
                 throw new BusinessRuleException(
                         "At least %d trials are required (Protokol §8); %d given"
                                 .formatted(properties.pump().minTrials(), trials.size()),
-                        Map.of("minTrials", properties.pump().minTrials()));
+                        Map.of("reason", "TOO_FEW_TRIALS", "minTrials", properties.pump().minTrials()));
             }
             calibration.setFlowMlPerSecond(pooledFlow(trials));
             calibration.setTrialCount(trials.size());
@@ -126,7 +126,8 @@ public class PumpCalibrationService {
             calibration.setFlowMlPerSecond(request.flowMlPerSecond());
             calibration.setTrialCount(request.trialCount() == null ? 1 : request.trialCount());
         } else {
-            throw new BusinessRuleException("Either trials or flowMlPerSecond is required");
+            throw new BusinessRuleException(
+                    "Either trials or flowMlPerSecond is required", Map.of("reason", "TRIALS_OR_FLOW_REQUIRED"));
         }
         calibration.setBusVoltage(request.busVoltage() != null ? request.busVoltage() : recentVoltage(calibratedAt));
         calibration.setNotes(request.notes() == null || request.notes().isBlank() ? null : request.notes().trim());
@@ -153,7 +154,8 @@ public class PumpCalibrationService {
         Instant end = to == null ? clock.instant() : to;
         Instant start = from == null ? end.minus(Duration.ofDays(1)) : from;
         if (start.isAfter(end)) {
-            throw new BusinessRuleException("The start of the range must not be after its end");
+            throw new BusinessRuleException(
+                    "The start of the range must not be after its end", Map.of("reason", "INVALID_RANGE"));
         }
         return dispensed(actuator, start, end);
     }

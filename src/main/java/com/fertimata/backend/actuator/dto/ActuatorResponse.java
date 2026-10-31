@@ -25,6 +25,10 @@ public record ActuatorResponse(
                         description = "Command names this actuator accepts; null when its type is unrestricted",
                         example = "[\"ON\", \"OFF\"]")
                 List<String> supportedCommands,
+        @Schema(
+                        description = "True when this actuator's type takes a pump flow calibration"
+                                + " (app.calibration.pump.types); the calibration endpoints reject the others")
+                boolean pumpCalibratable,
         String description,
         @JsonRawValue
                 @Schema(type = "object", description = "Informational hardware binding; never used for decisions")
@@ -32,7 +36,7 @@ public record ActuatorResponse(
         Instant createdAt,
         Instant updatedAt) {
 
-    public static ActuatorResponse from(Actuator actuator, List<String> supportedCommands) {
+    public static ActuatorResponse from(Actuator actuator, List<String> supportedCommands, boolean pumpCalibratable) {
         return new ActuatorResponse(
                 actuator.getId(),
                 actuator.getDevice().getId(),
@@ -45,6 +49,7 @@ public record ActuatorResponse(
                 actuator.getStateUpdatedAt(),
                 actuator.getMaxRunSeconds(),
                 supportedCommands,
+                pumpCalibratable,
                 actuator.getDescription(),
                 actuator.getMetadata(),
                 actuator.getCreatedAt(),

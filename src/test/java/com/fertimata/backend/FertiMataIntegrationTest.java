@@ -427,21 +427,31 @@ class FertiMataIntegrationTest {
     }
 
     @Test
-    @DisplayName("the transplant date drives HST and the AI fuzzy phases")
-    void transplantDateUsesAiPhases() throws Exception {
+    @DisplayName("the sowing date drives HST and the AI fuzzy phases")
+    void sowingDateUsesAiPhases() throws Exception {
         String token = signIn();
         java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Jakarta"));
 
-        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/cultivation/transplant-date")
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/cultivation/sowing-date")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("transplantDate", today.minusDays(30).toString()))))
+                        .content(json(Map.of("sowingDate", today.minusDays(30).toString()))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hst").value(30))
                 .andExpect(jsonPath("$.currentPhase.name").value("Pembungaan"))
                 .andExpect(jsonPath("$.currentPhase.ecTargetMin").value(1.2))
                 .andExpect(jsonPath("$.nextPhase.name").value("Pembuahan"))
-                .andExpect(jsonPath("$.daysUntilNextPhase").value(5));
+                .andExpect(jsonPath("$.daysUntilNextPhase").value(5))
+                .andExpect(jsonPath("$.cycle.sowingDate").value(today.minusDays(30).toString()));
+
+        // Frontend lama: alamat dan nama field lama tetap diterima.
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/cultivation/transplant-date")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(Map.of("transplantDate", today.minusDays(10).toString()))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hst").value(10))
+                .andExpect(jsonPath("$.cycle.transplantDate").value(today.minusDays(10).toString()));
     }
 
     @Test

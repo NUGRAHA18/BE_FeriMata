@@ -126,11 +126,7 @@ app:
   cultivation:
     # "Hari ini" untuk hitung HST (hari setelah transplant).
     zone: ${CULTIVATION_ZONE:Asia/Jakarta}
-    # Fase tanam MENGIKUTI FUZZY TIM AI (keputusan 29 Okt 2026: "kode yang sudah ada di AI, ikut AI"):
-    # Ai-code/app/ai/fuzzy_fertilizer FASE_MF (trapesium tumpang tindih). Batas tegas di sini = titik
-    # keanggotaan 0,5 (tengah daerah tumpang tindih) supaya aplikasi bisa menulis "Hari ke-N - fase".
-    # Target EC = inti himpunan "Optimal" EC fuzzy tingkat 2 AI (0,8 / 1,2-2,5 / 3), sama untuk semua fase.
-    # Rasio N:P:K tidak dipakai lagi: target N/P/K mutlak ada di fuzzy AI.
+    
     default-phases:
       - { code: SEMAI, name: Semai, start-hst: 0, end-hst: 7, ec-target-min: 1.2, ec-target-max: 2.5 }
       - { code: VEGETATIF, name: Vegetatif, start-hst: 8, end-hst: 24, ec-target-min: 1.2, ec-target-max: 2.5 }
@@ -194,10 +190,20 @@ app:
     check-interval: 30s
     # Jadwal yang terlewat lebih lama dari ini (backend mati) tidak dikejar.
     grace: ${IRRIGATION_GRACE:15m}
+    # AI (keputusan 31 Okt 2026): durasi dari fuzzy irigasi layanan AI saat jadwal tiba; durasi isian petani
+    # dipakai sebagai cadangan bila AI tidak bisa dipakai. MANUAL: selalu isian petani.
+    duration-source: ${IRRIGATION_DURATION_SOURCE:AI}
 
   # GET /api/ai/inputs: input fuzzy layanan AI. Nama field = form di Swagger layanan AI (Ai-code);
   # nilai = metric key sensor backend. Ubah di sini bila tim AI mengganti arti sebuah field.
   ai:
+    # Layanan AI tim AI (Flask, Ai-code/main.py, port 5000). Kosong = tidak dipanggil (siram memakai durasi cadangan).
+    service:
+      base-url: ${AI_SERVICE_URL:}
+      timeout: ${AI_SERVICE_TIMEOUT:90s}
+      # Foto patroli terbaru yang ikut dikirim ke run_irrigation untuk deteksi penyakit.
+      irrigation-photos: ${AI_IRRIGATION_PHOTOS:3}
+      photo-max-age: ${AI_IRRIGATION_PHOTO_MAX_AGE:24h}
     inputs:
       # Lebih tua dari ini = basi; field-nya null dan form tidak siap (S9).
       max-age: ${AI_INPUTS_MAX_AGE:15m}

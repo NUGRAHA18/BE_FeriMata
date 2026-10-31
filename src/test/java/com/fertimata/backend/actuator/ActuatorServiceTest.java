@@ -44,7 +44,8 @@ class ActuatorServiceTest {
         Actuator actuator = TestFixtures.actuator(7L, TestFixtures.device(1L, "RIO-TANK-01"), "DOSING-N");
         when(actuatorRepository.findByIdWithDevice(7L)).thenReturn(Optional.of(actuator));
         ActuatorService service = new ActuatorService(
-                actuatorRepository, deviceService, realtimeEventPublisher, jsonSupport, CommandVocabularyProperties.open());
+                actuatorRepository, deviceService, realtimeEventPublisher, jsonSupport, CommandVocabularyProperties.open(),
+                new com.fertimata.backend.calibration.CalibrationProperties(null, null, null, null, null));
 
         ActuatorResponse response =
                 service.update(7L, new ActuatorUpdateRequest(null, null, null, false, 45, null));

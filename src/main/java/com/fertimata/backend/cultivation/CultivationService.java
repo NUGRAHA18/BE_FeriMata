@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>Siklus tanam tidak lagi terlihat di aplikasi (29 Okt 2026): satu siklus ACTIVE hanya menyimpan
  * tanggal tanam pindah dan daftar fase (template {@code app.cultivation.default-phases}, mengikuti
- * fuzzy tim AI). Operator hanya mengubah tanggalnya lewat {@link #setTransplantDate}.
+ * fuzzy tim AI). Operator hanya mengubah tanggalnya lewat {@link #setSowingDate}.
  */
 @Service
 public class CultivationService {
@@ -71,20 +71,20 @@ public class CultivationService {
      * aktif, atau membuatnya (dengan template fase bawaan) bila belum ada.
      */
     @Transactional
-    public CycleStatusResponse setTransplantDate(LocalDate transplantDate) {
+    public CycleStatusResponse setSowingDate(LocalDate sowingDate) {
         PlantingCycle cycle = activeCycle().orElseGet(() -> {
-            String code = "MT-" + transplantDate;
+            String code = "MT-" + sowingDate;
             int n = 2;
             while (cycleRepository.existsByCode(code)) {
-                code = "MT-" + transplantDate + "-" + n++;
+                code = "MT-" + sowingDate + "-" + n++;
             }
-            PlantingCycle created = new PlantingCycle(code, "Musim tanam " + transplantDate, transplantDate);
+            PlantingCycle created = new PlantingCycle(code, "Musim tanam " + sowingDate, sowingDate);
             created.replacePhases(validatePhases(defaultPhases()));
             created.setStatus(CycleStatus.ACTIVE);
             return cycleRepository.save(created);
         });
-        cycle.setTransplantDate(transplantDate);
-        log.info("Transplant date set to {} (cycle {})", transplantDate, cycle.getCode());
+        cycle.setSowingDate(sowingDate);
+        log.info("Sowing date set to {} (cycle {})", sowingDate, cycle.getCode());
         return status(cycle);
     }
 
@@ -95,11 +95,11 @@ public class CultivationService {
      * @return true bila ada tanggal tanam yang dikosongkan
      */
     @Transactional
-    public boolean resetTransplantDate() {
+    public boolean resetSowingDate() {
         return activeCycle().map(cycle -> {
             cycle.setStatus(CycleStatus.ENDED);
             cycle.setEndedAt(today());
-            log.info("Transplant date {} cleared (cycle {} ended)", cycle.getTransplantDate(), cycle.getCode());
+            log.info("Sowing date {} cleared (cycle {} ended)", cycle.getSowingDate(), cycle.getCode());
             return true;
         }).orElse(false);
     }

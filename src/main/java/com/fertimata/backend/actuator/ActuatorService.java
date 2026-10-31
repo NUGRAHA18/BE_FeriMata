@@ -7,6 +7,7 @@ import com.fertimata.backend.actuator.dto.ActuatorResponse;
 import com.fertimata.backend.actuator.dto.ActuatorStatusResponse;
 import com.fertimata.backend.actuator.dto.ActuatorUpdateRequest;
 import com.fertimata.backend.actuator.safety.CommandVocabularyProperties;
+import com.fertimata.backend.calibration.CalibrationProperties;
 import com.fertimata.backend.common.exception.BusinessRuleException;
 import com.fertimata.backend.common.exception.ResourceNotFoundException;
 import com.fertimata.backend.common.util.JsonSupport;
@@ -34,18 +35,21 @@ public class ActuatorService {
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final JsonSupport jsonSupport;
     private final CommandVocabularyProperties vocabulary;
+    private final CalibrationProperties calibrationProperties;
 
     public ActuatorService(
             ActuatorRepository actuatorRepository,
             DeviceService deviceService,
             RealtimeEventPublisher realtimeEventPublisher,
             JsonSupport jsonSupport,
-            CommandVocabularyProperties vocabulary) {
+            CommandVocabularyProperties vocabulary,
+            CalibrationProperties calibrationProperties) {
         this.actuatorRepository = actuatorRepository;
         this.deviceService = deviceService;
         this.realtimeEventPublisher = realtimeEventPublisher;
         this.jsonSupport = jsonSupport;
         this.vocabulary = vocabulary;
+        this.calibrationProperties = calibrationProperties;
     }
 
     @Transactional(readOnly = true)
@@ -175,6 +179,9 @@ public class ActuatorService {
     }
 
     private ActuatorResponse toResponse(Actuator actuator) {
-        return ActuatorResponse.from(actuator, vocabulary.commandsFor(actuator.getType()));
+        return ActuatorResponse.from(
+                actuator,
+                vocabulary.commandsFor(actuator.getType()),
+                calibrationProperties.pump().covers(actuator.getType()));
     }
 }

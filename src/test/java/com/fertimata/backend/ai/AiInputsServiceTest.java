@@ -115,8 +115,8 @@ class AiInputsServiceTest {
     }
 
     @Test
-    @DisplayName("without a transplant date no form is ready")
-    void missingTransplantDate() {
+    @DisplayName("without a sowing date no form is ready")
+    void missingSowingDate() {
         when(cultivationService.activeStatus()).thenReturn(Optional.empty());
         when(sensorService.latestPerSensor()).thenReturn(List.of(reading("air.temperature", "29.5", null, Duration.ZERO)));
 
@@ -124,6 +124,6 @@ class AiInputsServiceTest {
 
         assertThat(inputs.hst()).isNull();
         assertThat(inputs.readyForIrrigation()).isFalse();
-        assertThat(inputs.problems()).contains("irrigation.hst: transplant date is not set");
+        assertThat(inputs.problems()).contains("irrigation.hst: sowing date is not set");
     }
 }

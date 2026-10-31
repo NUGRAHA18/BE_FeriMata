@@ -51,7 +51,7 @@ public final class RegressionFitter {
             throw new BusinessRuleException(
                     "At least %d samples with every covariate are needed to fit %d parameters; %d available"
                             .formatted(parameters + 1, parameters, usable.size()),
-                    Map.of("required", parameters + 1, "available", usable.size()));
+                    Map.of("reason", "TOO_FEW_SAMPLES", "required", parameters + 1, "available", usable.size()));
         }
 
         // Persamaan normal (XᵀX) β = Xᵀy dengan X = [1, raw, kovariat...].
@@ -143,7 +143,8 @@ public final class RegressionFitter {
             }
             if (Math.abs(m[pivot][col]) < threshold) {
                 throw new BusinessRuleException(
-                        "The samples cannot determine the model: a predictor is constant or duplicates another");
+                        "The samples cannot determine the model: a predictor is constant or duplicates another",
+                        Map.of("reason", "SINGULAR_MODEL"));
             }
             double[] tmp = m[col];
             m[col] = m[pivot];

@@ -75,8 +75,8 @@ class PlantServiceTest {
     }
 
     @Test
-    @DisplayName("deleting the last plant clears the transplant date so the next season starts fresh")
-    void deletingLastPlantResetsTransplantDate() {
+    @DisplayName("deleting the last plant clears the sowing date so the next season starts fresh")
+    void deletingLastPlantResetsSowingDate() {
         Plant plant = new Plant("Melon-01", "Melon 01");
         TestFixtures.setId(plant, 5L);
         when(plantRepository.findById(5L)).thenReturn(Optional.of(plant));
@@ -84,12 +84,12 @@ class PlantServiceTest {
 
         service.delete(5L);
 
-        verify(cultivationService).resetTransplantDate();
+        verify(cultivationService).resetSowingDate();
     }
 
     @Test
-    @DisplayName("deleting one of several plants keeps the transplant date")
-    void deletingOnePlantKeepsTransplantDate() {
+    @DisplayName("deleting one of several plants keeps the sowing date")
+    void deletingOnePlantKeepsSowingDate() {
         Plant plant = new Plant("Melon-01", "Melon 01");
         TestFixtures.setId(plant, 5L);
         when(plantRepository.findById(5L)).thenReturn(Optional.of(plant));
@@ -97,6 +97,6 @@ class PlantServiceTest {
 
         service.delete(5L);
 
-        org.mockito.Mockito.verify(cultivationService, org.mockito.Mockito.never()).resetTransplantDate();
+        org.mockito.Mockito.verify(cultivationService, org.mockito.Mockito.never()).resetSowingDate();
     }
 }

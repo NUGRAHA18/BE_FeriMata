@@ -148,6 +148,23 @@ public class IrrigationScheduleService {
         repository.findById(id).ifPresent(s -> s.recordRun(today, at, result, reasonCode, message, commandUid));
     }
 
+    /** Seperti {@link #record}, ditambah durasi yang dipakai dan sumbernya (AI / FALLBACK / MANUAL). */
+    @Transactional
+    public void record(
+            Long id,
+            LocalDate today,
+            Instant at,
+            IrrigationSchedule.RunResult result,
+            String reasonCode,
+            String message,
+            String commandUid,
+            Integer durationSeconds,
+            IrrigationDurationResolver.Source durationSource) {
+        repository.findById(id).ifPresent(s -> s.recordRun(
+                today, at, result, reasonCode, message, commandUid, durationSeconds,
+                durationSource == null ? null : durationSource.name()));
+    }
+
     /** Pompa siram yang aktif, bila ada. */
     @Transactional(readOnly = true)
     public Optional<Actuator> pump() {
@@ -202,7 +219,9 @@ public class IrrigationScheduleService {
                 s.getLastResult(),
                 s.getLastReasonCode(),
                 s.getLastMessage(),
-                s.getLastCommandUid());
+                s.getLastCommandUid(),
+                s.getLastDurationSeconds(),
+                s.getLastDurationSource());
     }
 
     private Instant nextRun(IrrigationSchedule s) {

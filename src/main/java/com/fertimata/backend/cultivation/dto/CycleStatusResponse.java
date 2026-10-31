@@ -6,7 +6,7 @@ import java.time.LocalDate;
 /**
  * Keadaan siklus aktif "hari ini": apa yang perlu diketahui dashboard dan (nanti) fuzzy dosing.
  *
- * @param hst hari setelah transplant; 0 pada hari transplant
+ * @param hst hari setelah semai; 0 pada hari semai
  * @param currentPhase null bila HST di luar semua fase yang didefinisikan
  * @param nextPhase fase berikutnya, bila ada
  * @param daysUntilNextPhase null bila tidak ada fase berikutnya

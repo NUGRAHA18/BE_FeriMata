@@ -22,7 +22,7 @@ import lombok.Setter;
  * Satu musim tanam.
  *
  * <p>Semua yang bergantung pada umur tanaman (HST, fase pertumbuhan, target EC, rasio N:P:K)
- * diturunkan dari {@link #transplantDate}. Fase-fasenya adalah data milik siklus ini, bukan
+ * diturunkan dari {@link #sowingDate}. Fase-fasenya adalah data milik siklus ini, bukan
  * konstanta: batas hari dan angka agronominya boleh berbeda antar musim.
  */
 @Entity
@@ -41,8 +41,8 @@ public class PlantingCycle extends AuditedEntity {
     @Column(length = 128)
     private String variety;
 
-    @Column(name = "transplant_date", nullable = false)
-    private LocalDate transplantDate;
+    @Column(name = "sowing_date", nullable = false)
+    private LocalDate sowingDate;
 
     @Column(name = "expected_harvest_date")
     private LocalDate expectedHarvestDate;
@@ -61,15 +61,15 @@ public class PlantingCycle extends AuditedEntity {
     @OrderBy("startHst asc")
     private List<GrowthPhase> phases = new ArrayList<>();
 
-    public PlantingCycle(String code, String name, LocalDate transplantDate) {
+    public PlantingCycle(String code, String name, LocalDate sowingDate) {
         this.code = code;
         this.name = name;
-        this.transplantDate = transplantDate;
+        this.sowingDate = sowingDate;
     }
 
-    /** Hari setelah transplant; 0 pada hari transplant, negatif bila siklus masih PLANNED. */
+    /** Hari setelah semai; 0 pada hari semai, negatif bila siklus masih PLANNED. */
     public long hstOn(LocalDate date) {
-        return ChronoUnit.DAYS.between(transplantDate, date);
+        return ChronoUnit.DAYS.between(sowingDate, date);
     }
 
     /** Fase yang berlaku pada HST tertentu, bila ada. */

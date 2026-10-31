@@ -17,7 +17,7 @@ import java.util.Map;
 public record AiInputsResponse(
         Instant generatedAt,
         @Schema(description = "Readings older than this are stale", example = "900") long maxAgeSeconds,
-        @Schema(description = "Days since the transplant date; null when it is not set in Settings") Integer hst,
+        @Schema(description = "Days since the sowing date; null when it is not set in Settings") Integer hst,
         @Schema(example = "PEMBUAHAN") String phaseCode,
         @Schema(example = "Pembuahan") String phaseName,
         @Schema(description = "All fertilization fields present, fresh, and HST known") boolean readyForFertilization,

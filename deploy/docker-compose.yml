@@ -113,12 +113,21 @@ services:
       # Trolley photos written by the edge agent on the host, served read-only at /captures/**.
       CAPTURES_DIR: /captures
 
+      # AI team's Flask service on the Jetson host. Watering duration comes from its fuzzy irrigation; the
+      # schedule's own duration is the fallback. Empty = never called. If Flask listens on 127.0.0.1 only,
+      # host.docker.internal cannot reach it: run it on the docker bridge address or 0.0.0.0 behind the firewall.
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-}
+      AI_SERVICE_TIMEOUT: ${AI_SERVICE_TIMEOUT:-90s}
+      IRRIGATION_DURATION_SOURCE: ${IRRIGATION_DURATION_SOURCE:-AI}
+
       LOG_LEVEL_APP: ${LOG_LEVEL_APP:-INFO}
       JAVA_OPTS: -XX:MaxRAMPercentage=75.0
     volumes:
       # The edge agent's camera.root (WorkingDirectory /var/lib/fertimata + data/citra). Read-only: the
       # backend never writes or deletes photos.
       - ${CAPTURES_HOST_DIR:-/var/lib/fertimata/data/citra}:/captures:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # The 8 GB are shared with inference; the JVM heap follows this limit.
     mem_limit: ${BACKEND_MEM_LIMIT:-1g}
 

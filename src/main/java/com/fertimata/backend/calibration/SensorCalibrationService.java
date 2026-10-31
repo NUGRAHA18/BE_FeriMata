@@ -253,6 +253,17 @@ public class SensorCalibrationService {
                 driftCheckRepository.findBySensorIdOrderByCheckedAtDesc(sensorId, pageable), DriftCheckResponse::from);
     }
 
+    /** Membuang uji drift yang salah ketik; hasil uji lain dan kalibrasi tidak berubah. */
+    @Transactional
+    public void deleteDriftCheck(Long sensorId, Long checkId) {
+        SensorDriftCheck check = driftCheckRepository
+                .findById(checkId)
+                .filter(c -> c.getSensor().getId().equals(sensorId))
+                .orElseThrow(() -> new ResourceNotFoundException("SensorDriftCheck", checkId));
+        driftCheckRepository.delete(check);
+        log.info("Drift check {} of sensor id={} deleted", checkId, sensorId);
+    }
+
     @Transactional
     public DriftCheckResponse addDriftCheck(Long sensorId, DriftCheckRequest request, String username) {
         Sensor sensor = sensorService.require(sensorId);
@@ -315,7 +326,7 @@ public class SensorCalibrationService {
         return new BusinessRuleException(
                 "Sensor %s has no reading in the %s before that time; enter %s by hand"
                         .formatted(sensor.getCode(), properties.readingMaxAge(), field),
-                Map.of("field", field));
+                Map.of("reason", "NO_RECENT_READING", "field", field));
     }
 
     private List<RegressionFitter.Point> points(List<CalibrationSample> samples) {
@@ -356,7 +367,9 @@ public class SensorCalibrationService {
     private static BigDecimal coefficient(double value) {
         BigDecimal result = decimal(value, 8);
         if (result == null) {
-            throw new BusinessRuleException("The model has an out-of-range coefficient (%s); check the samples".formatted(value));
+            throw new BusinessRuleException(
+                    "The model has an out-of-range coefficient (%s); check the samples".formatted(value),
+                    Map.of("reason", "COEFFICIENT_OUT_OF_RANGE"));
         }
         return result;
     }

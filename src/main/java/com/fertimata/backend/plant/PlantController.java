@@ -57,7 +57,7 @@ public class PlantController {
     @Operation(
             summary = "Delete a plant",
             description = "AI detections that pointed at it are kept without the plant. Deleting the LAST plant also clears "
-                    + "the transplant date (GET /api/cultivation/active becomes 404), so the next season starts again from "
+                    + "the sowing date (GET /api/cultivation/active becomes 404), so the next season starts again from "
                     + "adding the first plant.")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         plantService.delete(id);

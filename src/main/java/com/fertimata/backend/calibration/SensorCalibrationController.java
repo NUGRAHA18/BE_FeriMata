@@ -119,6 +119,14 @@ public class SensorCalibrationController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/drift-checks/{checkId}")
+    @PreAuthorize("hasRole('" + Role.Names.OPERATOR + "')")
+    @Operation(summary = "Delete a wrongly entered drift check")
+    public ResponseEntity<Void> deleteDriftCheck(@PathVariable Long sensorId, @PathVariable Long checkId) {
+        service.deleteDriftCheck(sensorId, checkId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/drift-checks")
     @Operation(summary = "Drift checks of a sensor, newest first")
     public PageResponse<DriftCheckResponse> driftChecks(

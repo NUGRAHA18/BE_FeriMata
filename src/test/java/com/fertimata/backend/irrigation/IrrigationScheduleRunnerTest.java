@@ -56,6 +56,9 @@ class IrrigationScheduleRunnerTest {
     @Mock
     private ActuatorCommandResponse commandResponse;
 
+    @Mock
+    private IrrigationDurationResolver durations;
+
     private IrrigationScheduleRunner runner;
     private Actuator pump;
 
@@ -65,18 +68,21 @@ class IrrigationScheduleRunnerTest {
                 schedules,
                 commandService,
                 alertService,
-                new IrrigationProperties(true, "DIST-PUMP", Duration.ofSeconds(30), Duration.ofMinutes(15)),
+                new IrrigationProperties(true, "DIST-PUMP", Duration.ofSeconds(30), Duration.ofMinutes(15), null),
+                durations,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         pump = TestFixtures.actuator(9L, TestFixtures.device(1L, "PANEL-01"), "DIST-PUMP");
         when(schedules.zone()).thenReturn(WIB);
     }
 
     @Test
-    @DisplayName("a due schedule claims its day first, then starts the pump for its duration")
+    @DisplayName("a due schedule claims its day first, then starts the pump for the AI fuzzy duration")
     void startsDueSchedule() {
         when(schedules.due(TODAY, LocalTime.of(6, 2))).thenReturn(List.of(new IrrigationScheduleService.Due(1L, LocalTime.of(6, 0), 300)));
         when(schedules.claim(1L, TODAY, NOW)).thenReturn(true);
         when(schedules.pump()).thenReturn(Optional.of(pump));
+        when(durations.resolve(300, null))
+                .thenReturn(new IrrigationDurationResolver.Decision(42, IrrigationDurationResolver.Source.AI, null, null));
         when(commandResponse.commandUid()).thenReturn("cmd-1");
         when(commandService.issueSystemCommand(eq(9L), any())).thenReturn(commandResponse);
 
@@ -85,9 +91,51 @@ class IrrigationScheduleRunnerTest {
         ArgumentCaptor<ActuatorCommandRequest> request = ArgumentCaptor.forClass(ActuatorCommandRequest.class);
         verify(commandService).issueSystemCommand(eq(9L), request.capture());
         assertThat(request.getValue().command()).isEqualTo("ON");
-        assertThat(request.getValue().parameters()).isEqualTo(Map.of("durationSeconds", 300));
-        verify(schedules).record(1L, TODAY, NOW, IrrigationSchedule.RunResult.STARTED, null, null, "cmd-1");
+        assertThat(request.getValue().parameters()).isEqualTo(Map.of("durationSeconds", 42));
+        verify(schedules).record(1L, TODAY, NOW, IrrigationSchedule.RunResult.STARTED, null, null, "cmd-1", 42,
+                IrrigationDurationResolver.Source.AI);
         verify(alertService, never()).raise(any());
+    }
+
+    @Test
+    @DisplayName("when the AI says no water is needed the pump stays off, without a warning")
+    void aiSaysNoWater() {
+        when(schedules.due(TODAY, LocalTime.of(6, 2))).thenReturn(List.of(new IrrigationScheduleService.Due(1L, LocalTime.of(6, 0), 300)));
+        when(schedules.claim(1L, TODAY, NOW)).thenReturn(true);
+        when(schedules.pump()).thenReturn(Optional.of(pump));
+        when(durations.resolve(300, null)).thenReturn(new IrrigationDurationResolver.Decision(
+                0, IrrigationDurationResolver.Source.AI, IrrigationDurationResolver.AI_NO_WATER_NEEDED, "0.0 s"));
+
+        runner.runDue(NOW);
+
+        verify(commandService, never()).issueSystemCommand(any(), any());
+        verify(schedules).record(eq(1L), eq(TODAY), eq(NOW), eq(IrrigationSchedule.RunResult.SKIPPED),
+                eq("AI_NO_WATER_NEEDED"), anyString(), isNull(), eq(0), eq(IrrigationDurationResolver.Source.AI));
+        verify(alertService, never()).raise(any());
+    }
+
+    @Test
+    @DisplayName("when the AI cannot be used the schedule still waters for its fallback duration, with an INFO alert")
+    void fallbackDurationWarns() {
+        when(schedules.due(TODAY, LocalTime.of(6, 2))).thenReturn(List.of(new IrrigationScheduleService.Due(1L, LocalTime.of(6, 0), 300)));
+        when(schedules.claim(1L, TODAY, NOW)).thenReturn(true);
+        when(schedules.pump()).thenReturn(Optional.of(pump));
+        when(durations.resolve(300, null)).thenReturn(new IrrigationDurationResolver.Decision(
+                300, IrrigationDurationResolver.Source.FALLBACK, IrrigationDurationResolver.AI_UNAVAILABLE, "refused"));
+        when(commandResponse.commandUid()).thenReturn("cmd-2");
+        when(commandService.issueSystemCommand(eq(9L), any())).thenReturn(commandResponse);
+
+        runner.runDue(NOW);
+
+        ArgumentCaptor<ActuatorCommandRequest> request = ArgumentCaptor.forClass(ActuatorCommandRequest.class);
+        verify(commandService).issueSystemCommand(eq(9L), request.capture());
+        assertThat(request.getValue().parameters()).isEqualTo(Map.of("durationSeconds", 300));
+        verify(schedules).record(1L, TODAY, NOW, IrrigationSchedule.RunResult.STARTED, "AI_UNAVAILABLE", "refused", "cmd-2",
+                300, IrrigationDurationResolver.Source.FALLBACK);
+        ArgumentCaptor<NewAlert> alert = ArgumentCaptor.forClass(NewAlert.class);
+        verify(alertService).raise(alert.capture());
+        assertThat(alert.getValue().type()).isEqualTo(AlertType.IRRIGATION_AI_FALLBACK);
+        assertThat(alert.getValue().metadata()).containsEntry("reasonCode", "AI_UNAVAILABLE");
     }
 
     @Test
@@ -108,6 +156,8 @@ class IrrigationScheduleRunnerTest {
         when(schedules.due(TODAY, LocalTime.of(6, 2))).thenReturn(List.of(new IrrigationScheduleService.Due(1L, LocalTime.of(6, 0), 300)));
         when(schedules.claim(1L, TODAY, NOW)).thenReturn(true);
         when(schedules.pump()).thenReturn(Optional.of(pump));
+        when(durations.resolve(300, null))
+                .thenReturn(new IrrigationDurationResolver.Decision(300, IrrigationDurationResolver.Source.MANUAL, null, null));
         when(commandService.issueSystemCommand(eq(9L), any()))
                 .thenThrow(new SafetyInterlockException("Running on backup power", Map.of("interlock", "BACKUP_POWER")));
 
