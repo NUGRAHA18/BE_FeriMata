@@ -36,11 +36,15 @@ class AiServiceClientTest {
     private HttpServer server;
     private final AtomicReference<String> requestBody = new AtomicReference<>();
     private final AtomicReference<String> contentType = new AtomicReference<>();
+    private final AtomicReference<String> contentLength = new AtomicReference<>();
+    private final AtomicReference<String> transferEncoding = new AtomicReference<>();
 
     private String serve(int status, String json) throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext(AiServiceClient.RUN_IRRIGATION, exchange -> {
             contentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
+            contentLength.set(exchange.getRequestHeaders().getFirst("Content-Length"));
+            transferEncoding.set(exchange.getRequestHeaders().getFirst("Transfer-Encoding"));
             requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.ISO_8859_1));
             byte[] out = json.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -96,6 +100,9 @@ class AiServiceClientTest {
 
         assertThat(seconds).isEqualTo(47.25);
         assertThat(contentType.get()).startsWith("multipart/form-data");
+        // Flask/Werkzeug membaca body chunked sebagai kosong: wajib Content-Length.
+        assertThat(transferEncoding.get()).isNull();
+        assertThat(Integer.parseInt(contentLength.get())).isEqualTo(requestBody.get().length());
         String body = requestBody.get();
         assertThat(body).contains("name=\"humidity_tanah\"").contains("35.5").contains("name=\"hst\"");
         assertThat(body).contains("filename=\"b.png\"").contains("filename=\"c.JPG\"");

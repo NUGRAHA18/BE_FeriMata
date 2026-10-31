@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
@@ -50,7 +51,11 @@ public class AiServiceClient {
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
                 HttpClient.newBuilder().connectTimeout(properties.timeout()).build());
         factory.setReadTimeout(properties.timeout());
-        this.restClient = RestClient.builder().requestFactory(factory).build();
+        // Buffered: body dikirim dengan Content-Length, bukan chunked. Server WSGI (Flask/Werkzeug) bisa
+        // membaca body chunked sebagai kosong, sehingga form sampai ke AI tanpa isi.
+        this.restClient = RestClient.builder()
+                .requestFactory(new BufferingClientHttpRequestFactory(factory))
+                .build();
     }
 
     public boolean configured() {
