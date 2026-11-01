@@ -22,12 +22,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Menutup perintah yang tidak pernah dijawab alat.
- *
- * <p>Ditandai FAILED dengan kode {@code NO_RESPONSE}, bukan dihapus: catatan audit tetap ada, dan ACK
- * yang datang terlambat masih bisa mengubahnya menjadi EXECUTED.
- */
+/** Menutup perintah tak terjawab sebagai FAILED {@code NO_RESPONSE}, bukan dihapus: audit tetap ada
+ * dan ACK terlambat masih bisa mengubahnya menjadi EXECUTED. */
 @Component
 public class CommandResponseTimeoutJob {
 
@@ -68,12 +64,8 @@ public class CommandResponseTimeoutJob {
         }
     }
 
-    /**
-     * Satu transaksi untuk semua perintah yang ditutup; TransactionTemplate karena dipanggil dari
-     * {@link #run()} di kelas yang sama, di mana {@code @Transactional} tidak berlaku.
-     *
-     * @return jumlah perintah yang ditutup
-     */
+    /** Satu transaksi untuk semua perintah yang ditutup; TransactionTemplate karena self-call dari {@link #run()}
+     * melewati {@code @Transactional}. Mengembalikan jumlah yang ditutup. */
     public int closeUnanswered(Instant now) {
         Integer closed = transaction.execute(status -> close(now));
         return closed == null ? 0 : closed;

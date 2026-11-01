@@ -9,14 +9,8 @@ import java.util.Optional;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * Refuses to start an actuator while one of another type is running, in one direction only.
- *
- * <p>{@link ExclusiveOperationGuard} is symmetric, which is wrong for the Rev A camera pan: the pan
- * must not move while the trolley runs, but the trolley may well run with the camera left facing
- * west. Like the exclusive guard, "running" is the last <em>reported</em> state, so this narrows the
- * window and the edge agent owns the hard sequencing.
- */
+/** One-way exclusion, e.g. Rev A camera pan must not move while the trolley runs, but not vice versa.
+ * "Running" is the last reported state, so this narrows the window; the edge owns hard sequencing. */
 @Component
 @Order(45)
 public class BlockedWhileActiveGuard implements CommandGuard {

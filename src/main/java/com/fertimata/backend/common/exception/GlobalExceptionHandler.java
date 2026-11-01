@@ -21,12 +21,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-/**
- * Turns every exception reaching the web layer into the single {@link ApiError} shape.
- *
- * <p>Two rules are enforced here: clients never receive a stack trace, and clients never receive an
- * internal message for unexpected failures. The full detail is logged server-side instead.
- */
+/** Maps every web-layer exception to {@link ApiError}: never a stack trace or internal message; details are logged. */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

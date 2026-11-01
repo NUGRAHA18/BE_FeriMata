@@ -8,6 +8,5 @@ public enum AlertSource {
     DEVICE,
     /** Raised by an automation rule. No rules exist yet; reserved for phase 2. */
     AUTOMATION,
-    /** Raised manually by an operator. */
     OPERATOR
 }

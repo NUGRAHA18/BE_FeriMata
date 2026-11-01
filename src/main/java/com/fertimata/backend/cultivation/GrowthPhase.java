@@ -12,12 +12,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Satu fase pertumbuhan dalam siklus tanam, dengan target agronomi yang berlaku selama fase itu.
- *
- * <p>Target EC dan rasio N:P:K adalah masukan fuzzy dosing (Arsitektur-Sistem.md §12); backend
- * menyimpannya sebagai data dan tidak pernah menilai apakah angkanya benar.
- */
+/** Fase pertumbuhan dengan target EC dan N:P:K untuk fuzzy dosing (Arsitektur-Sistem.md §12); backend tidak menilainya. */
 @Entity
 @Table(name = "growth_phase")
 @Getter

@@ -5,12 +5,7 @@ import com.fertimata.backend.device.Device;
 import com.fertimata.backend.sensor.Sensor;
 import java.util.Map;
 
-/**
- * Everything needed to raise an alert.
- *
- * <p>A small builder is used rather than a six-argument service method: most alerts set two or three
- * of these fields and callers should not have to pass nulls for the rest.
- */
+/** Everything needed to raise an alert; a builder because most alerts set only a few of these fields. */
 public record NewAlert(
         String type,
         AlertSeverity severity,

@@ -15,13 +15,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * A measurement channel exposed by a device.
- *
- * <p>Sensor kinds (pH, EC, temperature, ...) are <em>data</em>, not schema. They live in
- * {@link #type} and {@link #metricKey}; the hardware team can add, remove or rename a sensor without
- * a database migration and without touching business code.
- */
+/** Measurement channel of a device. Kinds are data ({@link #type}, {@link #metricKey}), so a new sensor needs no migration. */
 @Entity
 @Table(
         name = "sensor",
@@ -42,24 +36,14 @@ public class Sensor extends AuditedEntity {
     @Column(nullable = false, length = 64)
     private String code;
 
-    /**
-     * Key this sensor uses inside a telemetry payload, for example {@code temperature}.
-     *
-     * <p>This is the routing key between an inbound message and a stored reading. It is separate
-     * from {@link #code} because an operator-facing asset code and an on-the-wire field name change
-     * for different reasons.
-     */
+    /** Key in the telemetry payload (e.g. {@code temperature}); separate from {@link #code}, they change for different reasons. */
     @Column(name = "metric_key", nullable = false, length = 64)
     private String metricKey;
 
     @Column(nullable = false, length = 128)
     private String name;
 
-    /**
-     * Sensor kind as reported or configured, for example {@code TEMPERATURE}.
-     *
-     * <p>TODO(hardware): free text until the team freezes the sensor catalogue.
-     */
+    /** Sensor kind, e.g. {@code TEMPERATURE}. TODO(hardware): free text until the sensor catalogue is frozen. */
     @Column(length = 64)
     private String type;
 
@@ -70,12 +54,7 @@ public class Sensor extends AuditedEntity {
     @Column(nullable = false)
     private boolean enabled = true;
 
-    /**
-     * True when the sensor row was created automatically from an unrecognised telemetry metric.
-     *
-     * <p>Such rows start disabled: they preserve incoming data instead of dropping it, but they stay
-     * out of dashboards until an operator reviews and names them.
-     */
+    /** Auto-created from an unknown metric; starts disabled so data is kept but hidden until an operator reviews it. */
     @Column(name = "auto_registered", nullable = false)
     private boolean autoRegistered = false;
 

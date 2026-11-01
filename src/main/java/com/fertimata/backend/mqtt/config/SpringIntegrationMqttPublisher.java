@@ -13,12 +13,7 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 
-/**
- * Publishes through the Spring Integration outbound channel.
- *
- * <p>The rest of the backend only sees {@link MqttPublisher}; the Paho client, the channel and the
- * header names stop here.
- */
+/** Publishes via the Spring Integration outbound channel; Paho, channel and header names stop here. */
 @Component
 @ConditionalOnProperty(prefix = "app.mqtt", name = "enabled", havingValue = "true")
 public class SpringIntegrationMqttPublisher implements MqttPublisher {

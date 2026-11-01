@@ -11,12 +11,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 
-/**
- * Everything the main dashboard needs, in one response.
- *
- * <p>The shape exists so the PWA can render its first screen with a single request instead of a
- * dozen, and so that adding a panel later is a change here rather than another round-trip.
- */
+/** Everything the main dashboard needs in one response, so the PWA's first screen is a single request. */
 @Schema(name = "DashboardOverview")
 public record DashboardOverviewResponse(
         SystemSection system,
@@ -28,12 +23,7 @@ public record DashboardOverviewResponse(
         List<ActivityEntry> recentActivity,
         @Schema(description = "Null when no planting cycle is active") CultivationSection cultivation) {
 
-    /**
-     * Siklus tanam aktif hari ini: umur tanaman dan target fase, untuk kartu Beranda dan fuzzy dosing.
-     *
-     * @param hst hari setelah semai
-     * @param currentPhase null bila HST di luar fase yang didefinisikan
-     */
+    /** Siklus tanam aktif hari ini untuk kartu Beranda dan fuzzy dosing; currentPhase null bila HST di luar fase. */
     @Schema(name = "DashboardCultivationSection")
     public record CultivationSection(
             Long cycleId,
@@ -47,12 +37,7 @@ public record DashboardOverviewResponse(
             Long daysUntilNextPhase,
             long plantCount) {}
 
-    /**
-     * How the backend itself is running.
-     *
-     * @param mode DEVELOPMENT means mock messaging and the simulator may be active
-     * @param messagingTransport which transport is wired in, so a developer can tell mock from real
-     */
+    /** Backend runtime info; DEVELOPMENT mode means mock messaging and the simulator may be active. */
     @Schema(name = "DashboardSystemSection")
     public record SystemSection(
             String mode, String messagingTransport, boolean messagingConnected, Instant generatedAt) {}
@@ -70,14 +55,8 @@ public record DashboardOverviewResponse(
     public record AlertSection(long unacknowledged, long critical, long warning, List<AlertResponse> active) {}
 
     /**
-     * One line in the activity feed.
-     *
-     * <p>{@code summary} and {@code detail} are human-readable fallbacks. The structured fields are
-     * what a client should render from, so it never has to parse free text.
-     *
-     * @param status command status (PENDING / SENT / EXECUTED / FAILED / CANCELLED) for a command entry;
-     *     alert severity (INFO / WARNING / CRITICAL) for an alert entry
-     * @param actor who caused it: a username, or the command source / alert source
+     * Activity feed line; render from the structured fields, summary/detail are fallbacks. {@code status}: command status
+     * or alert severity; {@code actor}: username or command/alert source.
      */
     @Schema(name = "DashboardActivityEntry")
     public record ActivityEntry(

@@ -5,13 +5,8 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
 
-/**
- * Operator edits to an actuator.
- *
- * <p>Null fields are left unchanged. The device and code are not editable because command history
- * references them. Disabling is the quick way to take a suspect output out of service - for example
- * the distribution pump while its SSR is suspected of failing short.
- */
+/** Operator edits; null fields stay unchanged. Device and code are immutable because command history references them.
+ * Disabling takes a suspect output (e.g. distribution pump with a failing SSR) out of service. */
 @Schema(name = "ActuatorUpdateRequest")
 public record ActuatorUpdateRequest(
         @Size(max = 128) String name,

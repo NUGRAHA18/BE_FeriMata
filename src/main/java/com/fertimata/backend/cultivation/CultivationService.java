@@ -18,13 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Jawaban "hari ini HST berapa, fase apa", dihitung dari satu tanggal tanam pindah.
- *
- * <p>Siklus tanam tidak lagi terlihat di aplikasi (29 Okt 2026): satu siklus ACTIVE hanya menyimpan
- * tanggal tanam pindah dan daftar fase (template {@code app.cultivation.default-phases}, mengikuti
- * fuzzy tim AI). Operator hanya mengubah tanggalnya lewat {@link #setSowingDate}.
- */
+/** HST dan fase hari ini dari satu tanggal tanam; satu siklus ACTIVE tersembunyi, diubah hanya lewat {@link #setSowingDate}. */
 @Service
 public class CultivationService {
 
@@ -66,10 +60,7 @@ public class CultivationService {
         return properties.zone();
     }
 
-    /**
-     * Satu-satunya pengaturan budidaya di aplikasi: tanggal tanam pindah greenhouse. Memperbarui siklus
-     * aktif, atau membuatnya (dengan template fase bawaan) bila belum ada.
-     */
+    /** Satu-satunya pengaturan budidaya: tanggal tanam. Memperbarui siklus aktif atau membuatnya dengan template fase bawaan. */
     @Transactional
     public CycleStatusResponse setSowingDate(LocalDate sowingDate) {
         PlantingCycle cycle = activeCycle().orElseGet(() -> {
@@ -88,12 +79,7 @@ public class CultivationService {
         return status(cycle);
     }
 
-    /**
-     * Mengosongkan tanggal tanam: siklus aktif ditandai selesai (riwayatnya tetap ada). Dipanggil saat
-     * tanaman terakhir dihapus, supaya musim berikutnya dimulai lagi dari "Tambah tanaman pertama".
-     *
-     * @return true bila ada tanggal tanam yang dikosongkan
-     */
+    /** Mengosongkan tanggal tanam saat tanaman terakhir dihapus (siklus selesai, riwayat tetap); true bila ada yang dikosongkan. */
     @Transactional
     public boolean resetSowingDate() {
         return activeCycle().map(cycle -> {
@@ -135,12 +121,7 @@ public class CultivationService {
         return phases;
     }
 
-    /**
-     * Fase harus punya kode unik, rentang HST valid, dan tidak saling tumpang tindih. Menjaga template di
-     * konfigurasi tetap masuk akal.
-     *
-     * @return salinan yang terurut menurut HST awal; masukan tidak diubah
-     */
+    /** Validasi kode unik, rentang HST, dan tanpa tumpang tindih; mengembalikan salinan terurut HST awal. */
     static List<GrowthPhase> validatePhases(List<GrowthPhase> phases) {
         List<GrowthPhase> sorted = new ArrayList<>(phases);
         sorted.sort(Comparator.comparingInt(GrowthPhase::getStartHst));

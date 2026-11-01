@@ -9,12 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Menentukan berapa detik satu jadwal siram berjalan.
- *
- * <p>Keputusan 31 Okt 2026: durasi diambil dari fuzzy irigasi layanan AI ({@code run_irrigation}) saat
- * jadwal tiba. Durasi isian petani di jadwal menjadi <b>cadangan</b> bila AI tidak bisa dipakai (alamat
- * belum diisi, data sensor basi/kosong, atau layanan AI tidak menjawab), supaya tanaman tetap disiram.
- * Hasil AI 0 detik berarti AI memutuskan tidak perlu siram (tanah basah, fase panen, dsb.).
+ * Lama satu jadwal siram (keputusan 31 Okt 2026): dari fuzzy irigasi AI ({@code run_irrigation}); durasi isian petani
+ * jadi cadangan bila AI tidak bisa dipakai. AI 0 detik = tidak perlu siram.
  */
 @Component
 public class IrrigationDurationResolver {
@@ -27,7 +23,6 @@ public class IrrigationDurationResolver {
     static final String AI_NO_WATER_NEEDED = "AI_NO_WATER_NEEDED";
     static final String AI_CAPPED = "AI_CAPPED";
 
-    /** Sumber durasi yang dipakai. */
     public enum Source {
         /** Dari fuzzy irigasi AI. */
         AI,
@@ -37,11 +32,7 @@ public class IrrigationDurationResolver {
         MANUAL
     }
 
-    /**
-     * @param seconds durasi yang dikirim ke pompa; 0 = tidak siram
-     * @param reasonCode kenapa bukan durasi AI apa adanya (FALLBACK, dibatasi, atau tidak perlu siram); null bila biasa
-     * @param detail keterangan teknis untuk log/peringatan
-     */
+    /** {@code seconds} 0 = tidak siram; {@code reasonCode} null bila durasi AI dipakai apa adanya. */
     public record Decision(int seconds, Source source, String reasonCode, String detail) {
         public boolean skip() {
             return seconds <= 0;
@@ -59,10 +50,7 @@ public class IrrigationDurationResolver {
         this.aiClient = aiClient;
     }
 
-    /**
-     * @param fallbackSeconds durasi isian petani di jadwal
-     * @param maxRunSeconds batas pompa ({@code maxRunSeconds}); durasi AI dipotong ke sini agar tidak ditolak
-     */
+    /** {@code maxRunSeconds}: batas pompa; durasi AI dipotong ke sini agar tidak ditolak. */
     public Decision resolve(int fallbackSeconds, Integer maxRunSeconds) {
         if (properties.durationSource() == Source.MANUAL) {
             return new Decision(fallbackSeconds, Source.MANUAL, null, null);

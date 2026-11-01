@@ -4,12 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/**
- * Volume larutan yang dikeluarkan satu pompa dalam rentang waktu (Protokol §6 "volume tiap larutan").
- *
- * <p>Hanya perintah yang di-ACK EXECUTED yang dihitung. Durasi dipotong bila perintah berikutnya pada
- * pompa yang sama (mis. OFF) dieksekusi lebih dulu.
- */
+/** Volume keluar satu pompa (Protokol §6): hanya perintah ACK EXECUTED, dipotong perintah berikutnya (mis. OFF). */
 @Schema(name = "DispensedVolume")
 public record DispensedVolumeResponse(
         Long actuatorId,

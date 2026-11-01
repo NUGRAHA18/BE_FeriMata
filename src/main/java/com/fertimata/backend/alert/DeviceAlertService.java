@@ -17,13 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Stores alerts an edge device concluded on its own.
- *
- * <p>The type vocabulary is the device's. The backend adds what only it can: attaching the alert to
- * the registered device, sensor and actuator, deduplicating a fault the device keeps reporting, and
- * pushing it to the console.
- */
+/** Stores device-concluded alerts: links them to the registered device/sensor/actuator, dedups repeats, pushes to console. */
 @Service
 public class DeviceAlertService {
 
@@ -50,14 +44,8 @@ public class DeviceAlertService {
     }
 
     /**
-     * Records one device-reported alert.
-     *
-     * <p>While an alert of the same type is still unacknowledged for the device, a repeat is dropped:
-     * an SSR that stays shorted must not produce an alert every polling cycle. Once an operator
-     * acknowledges it, the next report raises it again. INFO alerts are events, not conditions, and
-     * are always recorded.
-     *
-     * @param deviceCode taken from the topic, not the payload
+     * Records one device alert; a repeat is dropped while one of that type is unacknowledged (a shorted SSR must not alert
+     * every poll). INFO alerts are events and always recorded. {@code deviceCode} comes from the topic, not the payload.
      */
     @Transactional
     public void record(String deviceCode, DeviceAlertPayload payload) {
@@ -99,8 +87,7 @@ public class DeviceAlertService {
 
         NewAlert built = alert.build();
         if (built.severity() == AlertSeverity.INFO) {
-            // An INFO alert reports an event that finished ("Patroli selesai, 20 foto"), not a condition
-            // that persists, so tonight's result must not be swallowed by last night's unread one.
+            // INFO reports a finished event, not a lasting condition: never swallowed by an older unread one.
             alertService.raise(built);
         } else {
             alertService.raiseOnceForDevice(built);

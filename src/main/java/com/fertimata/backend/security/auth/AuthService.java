@@ -42,13 +42,7 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    /**
-     * Authenticates a login attempt.
-     *
-     * @throws AuthenticationException when the credentials are wrong or the account is disabled;
-     *     the handler turns this into a 401 with a message that does not reveal which of the two it
-     *     was.
-     */
+    /** Authenticates a login; wrong credentials and a disabled account both become the same 401 message. */
     @Transactional
     public LoginResponse login(LoginRequest request, String userAgent) {
         Authentication authentication;
@@ -83,10 +77,7 @@ public class AuthService {
         refreshTokenService.revoke(request.refreshToken());
     }
 
-    /**
-     * Ganti sandi oleh pemilik akun. Semua sesi lain dicabut dan pasangan token baru dikembalikan,
-     * sehingga perangkat yang dipakai mengganti tetap masuk.
-     */
+    /** Ganti sandi oleh pemilik: sesi lain dicabut, pasangan token baru dikembalikan agar perangkat ini tetap masuk. */
     @Transactional
     public LoginResponse changePassword(String username, ChangePasswordRequest request, String userAgent) {
         User user = userRepository

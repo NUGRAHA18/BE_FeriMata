@@ -8,14 +8,8 @@ import java.util.Map;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * Refuses selected actuator types while the site runs on backup power.
- *
- * <p>On FERTIMATA Rev A the dosing pump flow is calibrated at the 27.2 V float voltage and drops with
- * battery voltage, so a dose on battery is inaccurate; the trolley is stopped to save energy. Which
- * types are affected is configuration. The edge agent enforces the same rule locally, because it must
- * hold even when the backend is down - this guard is what makes the refusal visible in the console.
- */
+/** Refuses configured types on backup power: Rev A dosing flow is calibrated at 27.2 V float and drops on battery;
+ * the trolley stops to save energy. The edge enforces this too; this guard makes the refusal visible. */
 @Component
 @Order(30)
 public class BackupPowerGuard implements CommandGuard {

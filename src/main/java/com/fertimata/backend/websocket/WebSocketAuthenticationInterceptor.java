@@ -15,13 +15,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 
-/**
- * Authenticates the STOMP {@code CONNECT} frame.
- *
- * <p>The HTTP handshake is left open because browsers cannot set an {@code Authorization} header on
- * a WebSocket upgrade. The token is therefore carried in the CONNECT frame instead, and this is
- * where it is verified - before any subscription is accepted.
- */
+/** Verifies the token in the STOMP CONNECT frame before any subscription; the handshake stays open because
+ * browsers cannot set {@code Authorization} on a WebSocket upgrade. */
 public class WebSocketAuthenticationInterceptor implements ChannelInterceptor {
 
     private static final Logger log = LoggerFactory.getLogger(WebSocketAuthenticationInterceptor.class);

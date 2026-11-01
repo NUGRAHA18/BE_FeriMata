@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
-/** STOMP implementation of {@link RealtimeEventPublisher}. */
 @Component
 public class StompRealtimeEventPublisher implements RealtimeEventPublisher {
 

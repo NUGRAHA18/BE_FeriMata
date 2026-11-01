@@ -14,12 +14,8 @@ import java.security.spec.ECPublicKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 
-/**
- * Kunci P-256 dalam format yang dipakai Web Push: titik publik tak terkompresi 65 byte
- * ({@code 0x04 || x || y}) dan kunci privat 32 byte, keduanya base64url tanpa padding. Format ini sama
- * dengan keluaran {@code npx web-push generate-vapid-keys} dan dengan {@code PushSubscription.getKey()}
- * di browser.
- */
+/** Kunci P-256 format Web Push: titik publik tak terkompresi 65 byte ({@code 0x04 || x || y}) dan privat 32 byte,
+ * base64url tanpa padding, sama dengan {@code npx web-push generate-vapid-keys} dan {@code PushSubscription.getKey()}. */
 final class EcKeys {
 
     static final ECParameterSpec P256 = p256();

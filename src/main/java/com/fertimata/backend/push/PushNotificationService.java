@@ -20,14 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-/**
- * Mengubah peringatan penting menjadi notifikasi di HP.
- *
- * <p>Dikirim setelah peringatan ter-commit dan di thread sendiri: server push di internet bisa lambat
- * atau tidak terjangkau saat koneksi greenhouse putus, dan itu tidak boleh menahan ingest telemetri
- * atau perintah aktuator yang memicu peringatan. Tidak ada antrean ulang: server push sendiri
- * menyimpan notifikasi untuk HP yang offline selama {@code app.push.ttl}.
- */
+/** Peringatan penting → notifikasi HP, dikirim setelah commit di thread sendiri agar server push yang lambat tidak
+ * menahan ingest/perintah. Tanpa antrean ulang: server push menyimpannya selama {@code app.push.ttl}. */
 @Service
 public class PushNotificationService {
 
@@ -116,10 +110,7 @@ public class PushNotificationService {
         return new PushTestResponse(delivered, removed, failed);
     }
 
-    /**
-     * Isi notifikasi yang dibaca service worker. {@code tag} membuat peringatan yang sama tidak
-     * menumpuk; {@code url} dibuka saat notifikasi diketuk.
-     */
+    /** Payload untuk service worker: {@code tag} mencegah peringatan sama menumpuk, {@code url} dibuka saat diketuk. */
     byte[] payload(AlertResponse alert) {
         Map<String, Object> message = new LinkedHashMap<>();
         message.put("title", alert.title());

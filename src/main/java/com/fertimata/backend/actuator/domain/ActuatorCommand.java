@@ -19,13 +19,8 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * An audit record of one attempt to command an actuator.
- *
- * <p>This table is the answer to the operator questions that matter after an incident: who turned
- * this on, when, was it a person or a rule, and did it actually happen. Rows are never deleted or
- * overwritten by a newer command - each request is its own row.
- */
+/** Audit record of one command attempt: who, when, person or rule, and whether it happened.
+ * Rows are never deleted or overwritten; each request is its own row. */
 @Entity
 @Table(name = "actuator_command")
 @Getter
@@ -33,13 +28,8 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor
 public class ActuatorCommand extends AuditedEntity {
 
-    /**
-     * Correlation id carried on the wire.
-     *
-     * <p>The device echoes it in its acknowledgement, which is how an ACK is matched back to the
-     * command that caused it. A database id is not used for this: it would leak internal
-     * identifiers onto the broker and break if history is ever re-keyed.
-     */
+    /** Correlation id on the wire, echoed in the device ACK to match it back. Not the DB id, which would
+     * leak internal identifiers to the broker and break if history is re-keyed. */
     @Column(name = "command_uid", nullable = false, unique = true, length = 36)
     private String commandUid = UUID.randomUUID().toString();
 
@@ -55,12 +45,7 @@ public class ActuatorCommand extends AuditedEntity {
     @Column(name = "command_type", nullable = false, length = 64)
     private String commandType;
 
-    /**
-     * Command arguments exactly as submitted, stored as JSON.
-     *
-     * <p>Kept opaque on purpose: the backend must not grow a column every time the hardware team
-     * adds a parameter, and it must not validate units it does not own yet.
-     */
+    /** Command arguments as submitted, stored as opaque JSON so new hardware parameters need no new column. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String parameters;
@@ -116,10 +101,7 @@ public class ActuatorCommand extends AuditedEntity {
     /** Kode {@link #failureCode} untuk perintah yang tidak dijawab alat dalam batas waktu. */
     public static final String NO_RESPONSE = "NO_RESPONSE";
 
-    /**
-     * Alat tidak menjawab. Bukan bukti perintah gagal dijalankan, hanya bahwa backend berhenti menunggu;
-     * ACK yang datang terlambat tetap boleh menimpanya (lihat {@link #isAwaitingLateAck()}).
-     */
+    /** Alat tidak menjawab: bukan bukti gagal, hanya backend berhenti menunggu; ACK terlambat boleh menimpanya. */
     public void markNoResponse(String text, Instant at) {
         markFailed(text, at);
         this.failureCode = NO_RESPONSE;

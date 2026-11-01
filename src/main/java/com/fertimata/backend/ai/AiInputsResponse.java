@@ -6,13 +6,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Snapshot sensor dengan nama field persis seperti form layanan AI.
- *
- * <p>{@code fertilization} dan {@code irrigation} bisa langsung dikirim sebagai form ke
- * {@code /api/fuzzy_sys/run_fertilization} dan {@code /api/fuzzy_sys/run_irrigation}, tetapi hanya bila
- * {@code readyFor…} bernilai true: field yang kosong atau basi bernilai null dan disebut di {@code problems}.
- */
+/** Snapshot sensor dengan nama field form layanan AI ({@code run_fertilization}/{@code run_irrigation}); hanya dipakai
+ * bila {@code readyFor…} true, field kosong/basi bernilai null dan disebut di {@code problems}. */
 @Schema(name = "AiInputs")
 public record AiInputsResponse(
         Instant generatedAt,

@@ -4,13 +4,8 @@ import com.fertimata.backend.user.UserResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
-/**
- * Pasangan token plus akun pemiliknya.
- *
- * <p>Token akses pendek umurnya (menit) dan dikirim di header {@code Authorization}. Refresh token
- * panjang umurnya (hari) dan hanya dikirim ke {@code POST /api/auth/refresh}; setiap pemakaian
- * menghasilkan pasangan baru dan mematikan yang lama.
- */
+/** Pasangan token + akun. Token akses berumur menit (header {@code Authorization}); refresh token berumur hari,
+ * hanya ke {@code POST /api/auth/refresh}, dan dirotasi setiap dipakai. */
 @Schema(name = "LoginResponse")
 public record LoginResponse(
         @Schema(description = "Signed JWT access token") String accessToken,

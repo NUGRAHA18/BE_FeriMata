@@ -8,12 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * Runs every {@link CommandGuard} and stamps the wire expiry on outgoing commands.
- *
- * <p>The command service depends on this one class rather than on the individual guards, so adding
- * an interlock never touches the command flow.
- */
+/** Runs every {@link CommandGuard} and stamps wire expiry; the command service depends only on this class. */
 @Component
 public class CommandSafetyPolicy {
 

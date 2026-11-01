@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 
-/** Read model for an actuator. */
 @Schema(name = "Actuator")
 public record ActuatorResponse(
         Long id,

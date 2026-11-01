@@ -13,14 +13,8 @@ import java.util.Optional;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * Refuses selected actuator types unless a reported signal is in an allowed state.
- *
- * <p>FERTIMATA Rev A uses this for the drum's float LOW switch: open means low water <em>or</em> a
- * broken wire, and both must keep the distribution pump, the dosing pumps and the stirrer off. A
- * missing or stale reading is treated the same way - the backend cannot tell a quiet sensor from a
- * dry drum. The edge agent enforces the rule locally as well; this guard makes the refusal visible.
- */
+/** Refuses types unless a signal is OK. Rev A: float LOW open = low water or broken wire, so distribution, dosing
+ * and stirrer stay off; a missing/stale reading counts as not OK. The edge enforces this too. */
 @Component
 @Order(35)
 public class SignalInterlockGuard implements CommandGuard {

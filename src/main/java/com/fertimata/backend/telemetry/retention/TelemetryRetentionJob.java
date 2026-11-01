@@ -8,14 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * Pekerjaan berkala yang menjaga ukuran tabel telemetri tetap terbatas.
- *
- * <p>Pembacaan ternormalisasi disimpan selama {@code readings-max-age}; payload mentah hanya selama
- * {@code raw-messages-max-age}. Keduanya dihapus per batch, dan satu putaran berhenti setelah
- * {@code max-batches-per-run} agar tidak pernah memonopoli database. Tumpukan yang sangat besar
- * (mis. database yang sudah terlanjur membengkak) habis dalam beberapa putaran.
- */
+/** Membatasi ukuran tabel telemetri: hapus per batch, berhenti setelah {@code max-batches-per-run}; sisanya putaran berikutnya. */
 @Component
 @ConditionalOnProperty(prefix = "app.telemetry.retention", name = "enabled", havingValue = "true")
 public class TelemetryRetentionJob {

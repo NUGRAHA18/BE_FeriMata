@@ -30,16 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Turns an inbound telemetry payload into stored readings and a realtime update.
- *
- * <p>This is the business half of the ingestion pipeline. The MQTT subscriber only deserialises and
- * calls in here; everything below - device resolution, metric mapping, validation, persistence and
- * the push to the PWA - lives in this class and is exercised identically whether a message arrived
- * from the broker, from the simulator, or from the development injection endpoint.
- *
- * <p>Two rules shape the error handling. A message the backend cannot fully understand is still
- * <em>recorded</em>, because the payload someone needs to debug is exactly the one that failed. And
- * one bad metric does not discard the good metrics in the same message.
+ * Turns telemetry into stored readings and a realtime push, identically for broker, simulator and dev endpoint.
+ * Rejected messages are still recorded, and one bad metric does not discard the good ones.
  */
 @Service
 public class TelemetryIngestService {
@@ -71,13 +63,7 @@ public class TelemetryIngestService {
         this.jsonSupport = jsonSupport;
     }
 
-    /**
-     * Ingests one telemetry message.
-     *
-     * @param deviceCode taken from the transport (the MQTT topic), never from the payload body: a
-     *     device must not be able to write telemetry attributed to another device
-     * @throws TelemetryValidationException when the message carries nothing usable at all
-     */
+    /** Ingests one message. {@code deviceCode} comes from the MQTT topic, never the payload, so a device cannot impersonate another. */
     @Transactional
     public TelemetryIngestResult ingest(
             String deviceCode, Instant deviceTimestamp, Map<String, Object> data, TelemetrySource source) {
@@ -143,8 +129,7 @@ public class TelemetryIngestService {
         deviceService.recordContact(resolvedDevice, recordedAt, null);
         publishUpdate(resolvedDevice, recordedAt, savedReadings);
 
-        // Pesan normal hanya DEBUG: PZEM saja mengirim tiap 3 detik di Jetson, dan satu baris INFO per pesan
-        // (puluhan ribu per hari) mendorong log penting keluar dari batas rotasi Docker dalam hitungan hari.
+        // Pesan normal cukup DEBUG: INFO per pesan (PZEM tiap 3 detik) mendorong log penting keluar dari rotasi Docker.
         if (rejectedMetrics.isEmpty()) {
             log.debug(
                     "Telemetry ingested from {} via {}: {} reading(s) stored",
@@ -186,13 +171,7 @@ public class TelemetryIngestService {
         }
     }
 
-    /**
-     * Keeps a device with a wrong clock from writing history in the future.
-     *
-     * <p>A missing timestamp is not an error - it simply means the device did not tell us, so the
-     * arrival time is used. Only a timestamp that is implausibly ahead is overridden; a timestamp in
-     * the past is kept, because that is what a device replaying buffered readings looks like.
-     */
+    /** Overrides only timestamps implausibly in the future (wrong clock); missing = arrival time, past kept (buffer replay). */
     private Instant normaliseTimestamp(String deviceCode, Instant deviceTimestamp, Instant receivedAt) {
         if (deviceTimestamp == null) {
             return receivedAt;
@@ -230,8 +209,7 @@ public class TelemetryIngestService {
         reading.setMetricKey(metricKey);
         reading.setNumericValue(value.numeric());
         reading.setTextValue(value.text());
-        // The unit is the sensor's, not the payload's: a device sending a bare number must not be
-        // able to silently change what that number means.
+        // Unit comes from the sensor, never the payload, so a device cannot change what a number means.
         reading.setUnit(sensor.getUnit());
         reading.setRecordedAt(recordedAt);
         reading.setReceivedAt(receivedAt);
@@ -255,23 +233,11 @@ public class TelemetryIngestService {
                 new TelemetryUpdate(device.getId(), device.getDeviceCode(), recordedAt, payload));
     }
 
-    /**
-     * Payload of a {@code SENSOR_READING_UPDATED} event.
-     *
-     * <p>One event per message rather than one per metric: a message carrying six metrics is one
-     * dashboard update, and sending six frames would make the client reassemble what the device
-     * already sent together.
-     */
+    /** {@code SENSOR_READING_UPDATED} payload: one event per message, not per metric. */
     public record TelemetryUpdate(
             Long deviceId, String deviceCode, Instant recordedAt, List<SensorReadingResponse> readings) {}
 
-    /**
-     * A telemetry value after type inspection.
-     *
-     * <p>Numbers are stored numerically so history queries can aggregate them; anything else that is
-     * still meaningful is kept as text rather than dropped. Structured values (objects, arrays) are
-     * rejected: nesting would need a contract that does not exist yet.
-     */
+    /** Parsed value: numbers stay numeric (aggregatable), other scalars text; objects/arrays rejected (no contract yet). */
     private record MetricValue(BigDecimal numeric, String text) {
 
         static Optional<MetricValue> parse(Object raw) {

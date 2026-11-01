@@ -5,12 +5,7 @@ import java.util.List;
 import java.util.function.Function;
 import org.springframework.data.domain.Page;
 
-/**
- * Transport shape for paginated results.
- *
- * <p>Spring's {@code Page} is not serialised directly: its JSON structure is an implementation
- * detail that would leak into the frontend contract.
- */
+/** Paginated result; Spring's {@code Page} JSON is not exposed, so it never leaks into the frontend contract. */
 @Schema(name = "PageResponse", description = "A page of results")
 public record PageResponse<T>(
         List<T> content, int page, int size, long totalElements, int totalPages, boolean last) {

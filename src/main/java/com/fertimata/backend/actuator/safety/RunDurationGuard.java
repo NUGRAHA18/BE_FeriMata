@@ -7,14 +7,8 @@ import java.util.Map;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/**
- * Keeps activating commands bounded in time.
- *
- * <p>An actuator must carry a run time when its type is listed in {@code timed-types} or when it has
- * its own {@code maxRunSeconds}; the value must then be a whole number of seconds within that limit.
- * Rev A has no mechanical timer relay, so this limit, together with the edge agent's own watchdog, is
- * what keeps an output from running on when its OFF never arrives.
- */
+/** Activating commands need a whole-second run time within limits when the type is in {@code timed-types} or has
+ * {@code maxRunSeconds}. Rev A has no mechanical timer relay; this plus the edge watchdog stop runaway outputs. */
 @Component
 @Order(10)
 public class RunDurationGuard implements CommandGuard {

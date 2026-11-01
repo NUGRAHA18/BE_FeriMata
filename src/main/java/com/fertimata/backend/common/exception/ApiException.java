@@ -2,12 +2,7 @@ package com.fertimata.backend.common.exception;
 
 import java.util.Map;
 
-/**
- * Base class for exceptions that map onto a documented API error.
- *
- * <p>Services throw subclasses of this instead of returning error codes, so controllers stay thin
- * and the mapping to HTTP lives in one place ({@link GlobalExceptionHandler}).
- */
+/** Base for documented API errors; mapped to HTTP in one place ({@link GlobalExceptionHandler}). */
 public class ApiException extends RuntimeException {
 
     private final ErrorCode errorCode;

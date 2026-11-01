@@ -13,12 +13,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * Satu sesi perangkat. Hanya hash token yang disimpan; nilai mentahnya hanya pernah ada di klien.
- *
- * <p>Dirotasi setiap kali dipakai: token lama di-revoke dan yang baru diterbitkan, sehingga token
- * yang bocor paling lama berguna sampai pemakaian berikutnya oleh pemilik aslinya.
- */
+/** Satu sesi perangkat; hanya hash token yang disimpan. Dirotasi tiap dipakai, jadi token bocor
+ * hanya berguna sampai pemilik aslinya memakainya lagi. */
 @Entity
 @Table(name = "refresh_token")
 @Getter

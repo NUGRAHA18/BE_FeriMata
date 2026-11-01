@@ -5,7 +5,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 
-/** Read model for an AI detection. */
 @Schema(name = "AiDetection")
 public record AiDetectionResponse(
         Long id,

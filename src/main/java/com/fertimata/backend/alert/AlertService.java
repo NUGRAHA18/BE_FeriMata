@@ -20,13 +20,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Raises, lists and acknowledges alerts.
- *
- * <p>Only infrastructure conditions produce alerts in this phase. No agronomic threshold is
- * evaluated anywhere: "pH is too low" needs a number nobody has agreed on, and inventing one would
- * put a made-up agronomic claim in front of an operator.
- */
+/** Raises, lists and acknowledges alerts. Infrastructure only: no agronomic threshold is agreed, so none is invented. */
 @Service
 public class AlertService {
 
@@ -74,10 +68,7 @@ public class AlertService {
         return response;
     }
 
-    /**
-     * Raises an alert only if an unacknowledged one of the same type is not already open for the
-     * device. Keeps a device that is offline for an hour from producing an alert every minute.
-     */
+    /** Raises only if no unacknowledged alert of this type is open for the device, so an outage does not alert every minute. */
     @Transactional
     public void raiseOnceForDevice(NewAlert request) {
         Long deviceId = request.relatedDevice() == null ? null : request.relatedDevice().getId();
@@ -113,12 +104,7 @@ public class AlertService {
         return true;
     }
 
-    /**
-     * Daftar alert, terbaru dulu. Setiap filter opsional dan bisa digabung.
-     *
-     * <p>Filter per perangkat/sensor/aktuator ada supaya halaman detail bisa menampilkan alert yang
-     * relevan saja, bukan menyaring 10 alert teratas dari overview di sisi klien.
-     */
+    /** Alert terbaru dulu; filter perangkat/sensor/aktuator opsional dan bisa digabung (untuk halaman detail). */
     @Transactional(readOnly = true)
     public PageResponse<AlertResponse> list(AlertFilter filter, Pageable pageable) {
         Pageable sorted = PageRequest.of(
@@ -152,12 +138,7 @@ public class AlertService {
         return alertRepository.countByAcknowledgedFalseAndSeverity(severity);
     }
 
-    /**
-     * Marks an alert as seen by the signed-in operator.
-     *
-     * @throws BusinessRuleException if it was already acknowledged, so a double click does not
-     *     silently overwrite who acknowledged it first
-     */
+    /** Marks an alert as seen; throws BusinessRuleException if already acknowledged, so the first acknowledger is kept. */
     @Transactional
     public AlertResponse acknowledge(Long id, String username) {
         Alert alert = alertRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Alert", id));

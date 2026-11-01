@@ -14,13 +14,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Pengelolaan akun oleh ADMIN.
- *
- * <p>Dua pagar pengaman supaya admin tidak mengunci dirinya sendiri: akun yang sedang dipakai tidak
- * boleh dinonaktifkan atau diturunkan perannya, dan ADMIN terakhir yang aktif tidak boleh
- * dihilangkan.
- */
+/** Pengelolaan akun oleh ADMIN. Pagar anti-terkunci: akun sendiri tidak bisa dinonaktifkan/diturunkan,
+ * dan ADMIN aktif terakhir tidak boleh hilang. */
 @Service
 public class UserService {
 

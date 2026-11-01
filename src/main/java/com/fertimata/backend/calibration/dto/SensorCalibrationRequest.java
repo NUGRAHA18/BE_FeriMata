@@ -8,11 +8,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Model koreksi yang dihitung di luar (mis. R atau SPSS) dan dimasukkan langsung.
- *
- * <p>Statistik kesesuaian yang dikosongkan dihitung dari sampel lab sensor ini bila ada.
- */
+/** Model dihitung di luar (mis. R/SPSS); statistik yang dikosongkan dihitung dari sampel lab bila ada. */
 @Schema(name = "SensorCalibrationRequest")
 public record SensorCalibrationRequest(
         @NotNull @Schema(example = "3.2") BigDecimal intercept,

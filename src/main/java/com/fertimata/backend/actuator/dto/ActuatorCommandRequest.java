@@ -5,17 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
 
-/**
- * A command the operator console asks the backend to deliver.
- *
- * <p>Only the command name and its parameters may be supplied. Everything else on the stored record
- * - who asked, when, from where, and what happened - is observed by the backend.
- *
- * <p>Parameters are validated for shape and size but not for meaning. {@code durationSeconds} is not
- * required and not range-checked here: safe dosing and run times are a hardware and agronomy
- * decision that has not been made, and enforcing an invented limit would be worse than enforcing
- * none. TODO(hardware): add per-command-type parameter rules once the contract is agreed.
- */
+/** Operator command: only name and parameters are client-supplied; who/when/outcome is observed by the backend.
+ * Parameters are checked for shape and size, not meaning. TODO(hardware): per-command-type rules. */
 @Schema(
         name = "ActuatorCommandRequest",
         example = "{\"command\": \"ON\", \"parameters\": {\"durationSeconds\": 60}}")

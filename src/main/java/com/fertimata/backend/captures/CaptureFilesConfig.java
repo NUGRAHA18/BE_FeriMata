@@ -9,14 +9,8 @@ import org.springframework.http.CacheControl;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * Serves the capture folder read-only at {@code /captures/**}.
- *
- * <p>Static resource handling, not a controller: Spring's resource resolver already refuses paths
- * that leave the folder ({@code ..}, encoded separators) and handles ranges and conditional requests.
- * Authentication comes from the security chain like any other request, so the browser must send the
- * bearer token; a plain {@code <img src>} cannot, and the frontend fetches the image instead.
- */
+/** Serves the capture folder read-only at {@code /captures/**}; Spring's resource resolver blocks path escapes.
+ * Requires the bearer token like the API, so the frontend fetches images instead of plain {@code <img src>}. */
 @Configuration
 public class CaptureFilesConfig implements WebMvcConfigurer {
 

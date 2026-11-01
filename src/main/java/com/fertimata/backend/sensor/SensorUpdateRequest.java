@@ -4,13 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
 
-/**
- * Operator edits to a sensor.
- *
- * <p>Exists mainly so an auto-registered sensor can be named and switched on after review. Null
- * fields are left unchanged; the device, code and metric key are not editable because history rows
- * already reference them.
- */
+/** Operator edits (mainly naming/enabling auto-registered sensors); null = unchanged. Device, code, metric key are fixed. */
 @Schema(name = "SensorUpdateRequest")
 public record SensorUpdateRequest(
         @Size(max = 128) String name,

@@ -18,16 +18,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Persists the lifecycle of an actuator command, each step in its own transaction.
- *
- * <p>This split exists for one reason: the audit record must survive a failed publish. If creating
- * the record and publishing shared a transaction, a broker outage would roll back the very row that
- * documents the attempt, and the operator would see nothing where they should see a failed command.
- *
- * <p>Every method returns a detached view rather than a managed entity, so callers cannot trip over
- * a lazy association after the transaction has closed.
- */
+/** Persists each command step in its own transaction so the audit row survives a failed publish.
+ * Returns detached views, never managed entities, to avoid lazy loading after commit. */
 @Component
 public class ActuatorCommandRecorder {
 

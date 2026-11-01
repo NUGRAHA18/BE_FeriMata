@@ -17,13 +17,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * A result produced by the vision model running on the edge device.
- *
- * <p>No model runs in the backend and no disease vocabulary is encoded here: {@link #label} is
- * whatever the model reported. The backend stores, serves and broadcasts detections; interpreting
- * them is the AI team's contract.
- */
+/** A vision-model result from the edge; no model or disease vocabulary in the backend, {@link #label} is as reported. */
 @Entity
 @Table(name = "ai_detection")
 @Getter
@@ -44,11 +38,7 @@ public class AiDetection extends BaseEntity {
     @Column(name = "detection_type", nullable = false, length = 64)
     private String detectionType;
 
-    /**
-     * The class the model reported. Free text: the label set belongs to the model, not to us.
-     *
-     * <p>Null for a multi-label result that only carries {@link #scores}.
-     */
+    /** Model-reported class, free text; null for a multi-label result that only carries {@link #scores}. */
     @Column(length = 128)
     private String label;
 
@@ -56,22 +46,12 @@ public class AiDetection extends BaseEntity {
     @Column(precision = 5, scale = 4)
     private BigDecimal confidence;
 
-    /**
-     * Where the evidence image can be fetched.
-     *
-     * <p>TODO(hardware/AI): image transport is undecided - the device may upload to object storage
-     * and send a URL, or send bytes over a separate channel. Only a reference is modelled for now.
-     */
+    /** Evidence image reference. TODO(hardware/AI): image transport undecided (object-storage URL or separate channel). */
     @Column(name = "image_url", length = 512)
     private String imageUrl;
 
-    /**
-     * Label to score map from a multi-label model, for example
-     * {@code {"Leaf_N_stress": 0.71, "Leaf_P_stress": 0.12, "Leaf_K_stress": 0.64}}.
-     *
-     * <p>FERTIMATA Rev A classifies with independent sigmoids so several deficiencies can be high at
-     * once; a single label cannot express that. Stored as reported - no threshold is applied here.
-     */
+    /** Multi-label scores, e.g. {@code {"Leaf_N_stress": 0.71, "Leaf_K_stress": 0.64}}; Rev A uses independent sigmoids
+     * so several deficiencies can be high at once. Stored as reported, no threshold applied. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String scores;

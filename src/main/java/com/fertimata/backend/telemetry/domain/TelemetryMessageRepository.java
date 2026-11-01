@@ -14,10 +14,7 @@ public interface TelemetryMessageRepository extends JpaRepository<TelemetryMessa
 
     long countByStatusAndReceivedAtAfter(TelemetryStatus status, Instant since);
 
-    /**
-     * Menghapus paling banyak {@code batchSize} payload mentah yang diterima sebelum {@code cutoff}.
-     * Pembacaan yang masih merujuk ke pesan tersebut ikut dilepas (ON DELETE SET NULL, lihat V3).
-     */
+    /** Menghapus ≤ {@code batchSize} payload mentah sebelum {@code cutoff}; pembacaan dilepas (ON DELETE SET NULL, V3). */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
             value =

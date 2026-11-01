@@ -13,12 +13,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * An edge device that talks to the backend over the message broker.
- *
- * <p>Nothing here assumes a Jetson. The device is identified by an opaque {@code deviceCode} that
- * also appears in its MQTT topics, and everything hardware-specific stays on the device side.
- */
+/** Edge device on the broker, identified by opaque {@code deviceCode} (also in its MQTT topics); not Jetson-specific. */
 @Entity
 @Table(name = "device")
 @Getter
@@ -33,12 +28,7 @@ public class Device extends AuditedEntity {
     @Column(nullable = false, length = 128)
     private String name;
 
-    /**
-     * Free-form classification, for example {@code EDGE_GATEWAY}.
-     *
-     * <p>TODO(hardware): kept as free text because the team has not settled on a device taxonomy.
-     * Promote to an enum once the set of device kinds is known.
-     */
+    /** Free-form kind, e.g. {@code EDGE_GATEWAY}. TODO(hardware): enum once the device taxonomy is settled. */
     @Column(length = 64)
     private String type;
 
@@ -53,22 +43,12 @@ public class Device extends AuditedEntity {
     @Column(length = 255)
     private String description;
 
-    /**
-     * Free-form attributes reported by the device (firmware version, agent build, ...).
-     *
-     * <p>Stored as JSON so that a device reporting a new attribute does not require a migration.
-     */
+    /** Device-reported attributes (firmware, agent build); JSON so a new attribute needs no migration. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String metadata;
 
-    /**
-     * Power source the device last reported, for example {@code MAINS} or {@code BATTERY}.
-     *
-     * <p>Reported, never derived: deciding that a mains voltage reading means an outage is the edge
-     * agent's job, because it has to act on it even while the backend is down. Null when the device
-     * does not report power at all.
-     */
+    /** Last reported power source ({@code MAINS}/{@code BATTERY}); reported, never derived. Null if the device does not report it. */
     @Column(name = "power_source", length = 16)
     private String powerSource;
 

@@ -15,14 +15,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/**
- * One metric from one telemetry message, normalised for querying.
- *
- * <p>Deliberately <em>not</em> one table per sensor kind: a new sensor is a new row here, never a
- * new table or column. The value is split into a numeric and a text column so that a future
- * non-numeric metric (a state string, a quality flag) does not force a schema change either -
- * numeric readings keep the indexable {@link #numericValue} column.
- */
+/** One metric of one message. Rows, not per-kind tables; numeric + text columns so non-numeric metrics need no migration. */
 @Entity
 @Table(name = "sensor_reading")
 @Getter

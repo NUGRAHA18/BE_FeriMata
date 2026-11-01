@@ -17,12 +17,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Pengingat uji drift mingguan (Protokol §7) dan kalibrasi pompa bulanan (Protokol §8).
- *
- * <p>Hanya INFO dan sekali per sensor/aktuator sampai ditandai sudah ditangani: ini pekerjaan rutin,
- * bukan bahaya. Daftar sensor dan tipe pompa datang dari konfigurasi.
- */
+/** Pengingat uji drift mingguan (Protokol §7) dan kalibrasi pompa bulanan (§8): INFO, sekali sampai ditangani. */
 @Service
 public class CalibrationReminderService {
 

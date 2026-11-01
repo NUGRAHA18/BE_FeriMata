@@ -2,13 +2,8 @@ package com.fertimata.backend.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/**
-* Pembuatan akun saat pertama kali aplikasi dijalankan.
-* Data login diambil langsung dari environment, cuma dipakai sekali pas tabel user masih kosong, dan
-* tidak pernah dicatat ke log sama sekali.
- *
- * @param enabled status aktif untuk buat akun operator pertama pas belum ada akun sama sekali
- */
+/** Akun operator pertama dari environment, dibuat sekali saat tabel user kosong bila {@code enabled};
+ * kredensial tidak pernah di-log. */
 @ConfigurationProperties(prefix = "app.bootstrap")
 public record BootstrapProperties(boolean enabled, String operatorUsername, String operatorPassword,
         String operatorFullName) {

@@ -9,15 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/**
- * DEVELOPMENT ONLY. Stands in for the broker when {@code app.mqtt.enabled} is false.
- *
- * <p>Lets the whole backend - REST, persistence, command auditing, WebSocket push - run with no
- * broker and no hardware, which is what unblocks the frontend developer before integration.
- *
- * <p>It keeps the last few published messages in memory so a developer can confirm what the backend
- * would have sent. It is not a broker: nothing is delivered anywhere.
- */
+/** DEVELOPMENT ONLY: stands in for the broker when {@code app.mqtt.enabled} is false so the backend runs
+ * without broker/hardware. Keeps recent messages in memory; nothing is delivered. */
 @Component
 @ConditionalOnProperty(prefix = "app.mqtt", name = "enabled", havingValue = "false", matchIfMissing = true)
 public class LoopbackMqttPublisher implements MqttPublisher {

@@ -19,12 +19,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * Model koreksi satu sensor terhadap uji laboratorium (Protokol-Data.md §7).
- *
- * <p>Append-only: kalibrasi baru adalah baris baru dengan {@link #validFrom} lebih akhir, sehingga
- * pembacaan lama tetap dikoreksi dengan model yang berlaku saat itu. Nilai mentah tidak pernah diubah.
- */
+/** Model koreksi sensor vs lab (Protokol-Data.md §7). Append-only per {@link #validFrom}; nilai mentah tidak pernah diubah. */
 @Entity
 @Table(name = "sensor_calibration")
 @Getter

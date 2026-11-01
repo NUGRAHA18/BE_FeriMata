@@ -27,16 +27,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Menjalankan jadwal siram: pada jamnya mengirim perintah ON berdurasi ke pompa siram.
- *
- * <p>Perintah lewat {@link ActuatorCommandService#issueSystemCommand}, jalur yang sama dengan tombol di
- * aplikasi, sehingga semua aturan keselamatan berlaku dan riwayat mencatat "SYSTEM". Siram yang ditolak
- * (PLN padam, air drum habis, pompa pupuk sedang jalan) tidak diulang; operator diberi peringatan.
- * Jadwal yang terlewat karena backend mati lebih lama dari {@code grace} juga tidak dikejar: siram siang
- * bolong untuk jadwal pagi bisa lebih merugikan daripada melewatkannya.
- *
- * <p>Durasinya ditentukan {@link IrrigationDurationResolver}: fuzzy irigasi AI, dengan durasi jadwal sebagai
- * cadangan. AI menjawab 0 detik = tidak siram hari itu (SKIPPED, {@code AI_NO_WATER_NEEDED}, tanpa peringatan).
+ * Mengirim ON berdurasi ke pompa siram lewat {@link ActuatorCommandService#issueSystemCommand} (aturan keselamatan berlaku).
+ * Siram yang ditolak atau terlewat lebih dari {@code grace} tidak diulang; durasi dari {@link IrrigationDurationResolver}.
  */
 @Component
 public class IrrigationScheduleRunner {

@@ -15,12 +15,7 @@ import java.util.TreeSet;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Sampel lab satu sensor sebagai CSV, untuk dibuka di Excel saat memeriksa hasil kalibrasi.
- *
- * <p>Waktu dalam zona kebun (WIB); setiap kovariat (mis. kelembapan tanah saat sampel diambil) menjadi
- * kolom sendiri.
- */
+/** Sampel lab satu sensor sebagai CSV untuk Excel; waktu WIB, tiap kovariat jadi kolom sendiri. */
 @Component
 public class CalibrationSampleCsvExporter {
 

@@ -4,12 +4,7 @@ import com.fertimata.backend.actuator.domain.Actuator;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
-/**
- * Current state of an actuator as last reported by its device.
- *
- * <p>{@code currentState} is null until the device reports one. The backend never guesses a state
- * from the commands it sent.
- */
+/** Last device-reported state; {@code currentState} is null until reported, never guessed from sent commands. */
 @Schema(name = "ActuatorStatus")
 public record ActuatorStatusResponse(
         Long id, String code, boolean enabled, String currentState, Instant stateUpdatedAt, String deviceCode) {

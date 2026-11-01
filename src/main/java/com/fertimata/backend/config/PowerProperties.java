@@ -4,16 +4,8 @@ import java.util.List;
 import java.util.Locale;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/**
- * Cara interpretasi sumber daya (power sources) yang dilaporkan.
- *
- * <p>Kosakata ini miliknya edge agent, jadi backend cuma perlu tahu nilai mana saja yang artinya
- * "normal supply". Selain itu — mau {@code BATTERY}, {@code UNKNOWN}, atau nilai yang belum pernah
- * kelihatan di build ini — bakal diangp jalan pakai backup, yang merupakan pembacaan paling aman
- * buat interlock.
- *
- * @param normalSources nilai power source yang menandakan lokasi lagi pakai normal supply
- */
+/** Hanya {@code normalSources} yang dianggap listrik normal; selain itu (BATTERY, UNKNOWN, nilai baru)
+ * dianggap cadangan, pembacaan paling aman untuk interlock. Kosakata milik edge agent. */
 @ConfigurationProperties(prefix = "app.power")
 public record PowerProperties(List<String> normalSources) {
 

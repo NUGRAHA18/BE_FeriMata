@@ -1,21 +1,11 @@
 package com.fertimata.backend.actuator.domain;
 
-/**
- * Outbound port for delivering a command to the device that owns the actuator.
- *
- * <p>Declared by the domain and implemented by the messaging layer, which is what keeps
- * {@code ActuatorCommandService} free of topics, payload shapes and broker clients. Swapping MQTT
- * for something else means writing a new implementation of this interface and changing nothing else.
- */
+/** Outbound port owned by the domain, keeping the command service free of topics, payloads and broker
+ * clients; replacing MQTT only needs a new implementation. */
 public interface ActuatorCommandTransport {
 
-    /**
-     * Hands the command to the transport.
-     *
-     * @throws com.fertimata.backend.common.exception.MessagePublishException when delivery to the
-     *     messaging infrastructure fails. Success means the broker accepted the message - never that
-     *     the hardware acted on it.
-     */
+    /** Hands the command over; success means the broker accepted it, never that hardware acted.
+     * Throws {@code MessagePublishException} when delivery to the messaging infrastructure fails. */
     void send(OutboundCommand command);
 
     /** Whether the transport currently believes it can deliver. */

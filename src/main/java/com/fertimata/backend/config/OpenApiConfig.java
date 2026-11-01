@@ -23,12 +23,8 @@ import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Metadata dokumen OpenAPI serta skema keamanan bearer-token yang digunakan di seluruh API.
- *
- * <p>Jalur yang bukan controller (foto patroli, health check) ditulis manual di sini supaya file
- * OpenAPI yang di-import ke Postman lengkap. WebSocket bukan REST, jadi daftarnya ada di deskripsi.
- */
+/** Metadata OpenAPI dan skema bearer-token. Jalur non-controller (foto patroli, health) ditulis manual agar
+ * import Postman lengkap; WebSocket dijelaskan di deskripsi. */
 @Configuration
 public class OpenApiConfig {
 
@@ -88,11 +84,8 @@ public class OpenApiConfig {
         return GroupedOpenApi.builder().group("semua").displayName("Semua endpoint").pathsToMatch("/**").build();
     }
 
-    /**
-     * Hanya yang dipakai layanan AI (penjadwal dosing di Jetson): /v3/api-docs/layanan-ai →
-     * openapi/fertimata-openapi-layanan-ai.json, untuk di-import tim AI ke Postman sebagai koleksi sendiri.
-     * Diturunkan dari alurnya: login → baca input fuzzy → cari pompa → kirim perintah → tunggu hasilnya.
-     */
+    /** Subset untuk layanan AI: /v3/api-docs/layanan-ai → openapi/fertimata-openapi-layanan-ai.json (koleksi Postman tim AI),
+     * mengikuti alurnya: login → input fuzzy → cari pompa → kirim perintah → tunggu hasil. */
     @Bean
     public GroupedOpenApi aiServiceEndpoints() {
         return GroupedOpenApi.builder()

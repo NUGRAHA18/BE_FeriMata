@@ -32,12 +32,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Kalibrasi sensor terhadap lab, sampel berpasangan, dan uji drift (Protokol-Data.md §7).
- *
- * <p>Backend tidak menilai apakah sebuah model "cukup baik"; ia menghitung dan menyimpan R², RMSE, MAE
- * dan Bland-Altman supaya tim bisa melaporkannya. Nilai mentah sensor tidak pernah ditulis ulang.
- */
+/** Kalibrasi lab, sampel berpasangan, uji drift (Protokol-Data.md §7). Menyimpan R², RMSE, MAE, Bland-Altman tanpa menilai. */
 @Service
 public class SensorCalibrationService {
 

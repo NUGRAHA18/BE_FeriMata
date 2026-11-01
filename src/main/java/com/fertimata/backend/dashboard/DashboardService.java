@@ -24,13 +24,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Assembles the dashboard overview.
- *
- * <p>The aggregation lives here rather than in the controller, and it reuses the domain services
- * rather than reaching into repositories, so the numbers on the dashboard cannot drift from the
- * numbers on the individual endpoints.
- */
+/** Assembles the dashboard via domain services (not repositories) so its numbers match the individual endpoints. */
 @Service
 public class DashboardService {
 
@@ -128,22 +122,14 @@ public class DashboardService {
                 .orElse(null);
     }
 
-    /**
-     * A merged feed of the last commands and alerts.
-     *
-     * <p>Two sources are enough to answer "what just happened here?" without turning the dashboard
-     * into an audit log; the dedicated endpoints stay the place to dig further.
-     */
-    /**
-     * Kode alasan peringatan, supaya klien tidak mencocokkan teks pesan: metadata.failureCode (perintah
-     * gagal, mis. NO_RESPONSE) atau metadata.reasonCode (jadwal siram dibatalkan, mis. BACKUP_POWER).
-     */
+    /** Alasan dari metadata.failureCode (perintah gagal) atau reasonCode (siram batal), agar klien tak mencocokkan teks. */
     private String failureCode(AlertResponse alert) {
         Map<String, Object> metadata = jsonSupport.toMap(alert.metadata());
         Object code = metadata.containsKey("failureCode") ? metadata.get("failureCode") : metadata.get("reasonCode");
         return code == null ? null : code.toString();
     }
 
+    /** Merged feed of recent commands and alerts; the dedicated endpoints hold the full history. */
     private List<DashboardOverviewResponse.ActivityEntry> recentActivity(List<AlertResponse> activeAlerts) {
         List<DashboardOverviewResponse.ActivityEntry> entries = new ArrayList<>();
 

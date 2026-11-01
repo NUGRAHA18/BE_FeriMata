@@ -5,12 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/**
- * Operator-supplied registration for a new device.
- *
- * <p>Only these fields may be provided. Status and last-seen time are observed by the backend, never
- * claimed by a client.
- */
+/** Operator registration; status and last-seen are observed by the backend, never client-supplied. */
 @Schema(name = "DeviceRegistrationRequest")
 public record DeviceRegistrationRequest(
         @NotBlank

@@ -14,12 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Handles device heartbeat and state messages.
- *
- * <p>Any message on this topic counts as proof of life, including an empty one - which is what makes
- * a plain heartbeat possible without inventing a payload contract for it.
- */
+/** Device heartbeat and state. Any message, even empty, is proof of life, so heartbeats need no payload contract. */
 @Component
 public class DeviceStatusMqttHandler implements MqttMessageHandler {
 

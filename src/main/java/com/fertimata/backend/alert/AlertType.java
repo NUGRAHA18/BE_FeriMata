@@ -1,13 +1,6 @@
 package com.fertimata.backend.alert;
 
-/**
- * Well-known alert type identifiers.
- *
- * <p>Deliberately constants rather than an enum: agronomic alert types (threshold breaches, disease
- * findings) are not decided yet, and an edge device or a future rule must be able to raise a type
- * this build has never heard of. The column stores free text; these are the ones the backend itself
- * produces today.
- */
+/** Well-known alert types. Constants, not an enum: the column is free text and devices/future rules may raise new types. */
 public final class AlertType {
 
     /** A registered device stopped reporting within its configured timeout. */
@@ -40,12 +33,7 @@ public final class AlertType {
     /** A dosing pump's flow calibration is missing or older than the recalibration interval. */
     public static final String PUMP_CALIBRATION_DUE = "PUMP_CALIBRATION_DUE";
 
-    /**
-     * Fallback type for a device-reported alert that did not name one.
-     *
-     * <p>Devices normally send their own type (for example {@code SSR_SHORT} or
-     * {@code DOSING_NOT_CONVERGING}); the backend stores it as given.
-     */
+    /** Fallback for a device alert without a type; devices normally send their own (e.g. {@code SSR_SHORT}), stored as given. */
     public static final String DEVICE_REPORTED = "DEVICE_REPORTED";
 
     private AlertType() {}

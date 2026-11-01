@@ -34,14 +34,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * DEVELOPMENT ONLY endpoints for driving the backend without hardware.
- *
- * <p>The whole controller is annotated {@code @Profile("dev")}, so these routes do not exist at all
- * in any other profile - they cannot be left switched on by a forgotten property. They still require
- * authentication, like every other {@code /api} route.
- *
- * <p>Injected messages take the same path a real device message would, so what a frontend developer
- * sees here is what they will see from real hardware.
+ * DEVELOPMENT ONLY endpoints; {@code @Profile("dev")} so they cannot exist in other profiles, and still authenticated.
+ * Injected messages take the same path as real device messages.
  */
 @RestController
 @RequestMapping("/api/dev")

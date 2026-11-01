@@ -4,19 +4,8 @@ import java.time.Duration;
 import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/**
- * Broker connection and topic configuration.
- *
- * <p><b>Topic names are provisional.</b> The naming convention is not locked, so every topic is a
- * template configured here and nowhere else - no topic string is written in Java code. When the
- * hardware team settles the convention, this file changes and nothing else does.
- *
- * <p>Credentials come from the environment and are never logged or exposed through the API.
- *
- * @param enabled when false no broker connection is attempted and the in-memory loopback transport
- *     is used instead, which is what lets the backend run with no hardware and no broker present
- * @param topics templates per {@link TopicKind}; {@code {deviceId}} is substituted with a device code
- */
+/** Broker and topic config. Topic names are provisional, so every topic is a template here, never in Java.
+ * {@code enabled=false} uses the in-memory loopback (no broker/hardware); credentials are never logged. */
 @ConfigurationProperties(prefix = "app.mqtt")
 public record MqttProperties(
         boolean enabled,

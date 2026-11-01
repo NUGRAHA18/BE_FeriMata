@@ -7,16 +7,8 @@ import java.util.Objects;
 import java.util.Optional;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-/**
- * Which command names, and which parameters, each actuator type accepts.
- *
- * <p>Like the interlocks this is configuration owned by the hardware catalogue, keyed by actuator
- * type. A type that no vocabulary lists accepts any command name, which keeps actuators registered
- * by hand through the API working as before. Command names compare case-insensitively; parameter
- * names and text values are passed to the edge agent unchanged, so they compare exactly.
- *
- * @param vocabularies one entry per group of actuator types sharing the same commands
- */
+/** Accepted commands and parameters per actuator type (hardware catalogue); unlisted types accept any command.
+ * Command names compare case-insensitively; parameter names and text values exactly, as the edge reads them. */
 @ConfigurationProperties(prefix = "app.actuator.commands")
 public record CommandVocabularyProperties(List<Vocabulary> vocabularies) {
 
@@ -46,11 +38,7 @@ public record CommandVocabularyProperties(List<Vocabulary> vocabularies) {
         return forType(type).map(Vocabulary::commands).orElse(null);
     }
 
-    /**
-     * @param types actuator types this vocabulary applies to
-     * @param commands accepted command names; anything else is refused with 400
-     * @param parameters rules for parameters of specific commands; parameters not listed pass through
-     */
+    /** Commands accepted by {@code types}, anything else is 400; parameters without a rule pass through. */
     public record Vocabulary(List<String> types, List<String> commands, List<ParameterRule> parameters) {
 
         public Vocabulary {
@@ -71,15 +59,8 @@ public record CommandVocabularyProperties(List<Vocabulary> vocabularies) {
         }
     }
 
-    /**
-     * @param command the command this rule applies to
-     * @param name parameter name, exactly as the edge agent reads it
-     * @param kind {@code INTEGER}, {@code NUMBER} or {@code TEXT}
-     * @param required defaults to true
-     * @param min inclusive lower bound for numbers
-     * @param max inclusive upper bound for numbers
-     * @param allowedValues accepted values for text; empty accepts any non-blank text
-     */
+    /** {@code kind}: INTEGER, NUMBER or TEXT; {@code required} defaults to true; {@code min}/{@code max} inclusive;
+     * empty {@code allowedValues} accepts any non-blank text. {@code name} is exactly what the edge reads. */
     public record ParameterRule(
             String command,
             String name,

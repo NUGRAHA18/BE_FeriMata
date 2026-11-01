@@ -6,11 +6,8 @@ import java.util.Locale;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Pengaturan kalibrasi (Protokol-Data.md §7-§8).
- *
- * @param readingMaxAge umur maksimum pembacaan sensor yang boleh dipakai mengisi otomatis nilai sensor
- *     pada sampel lab, uji drift, atau tegangan bus pada kalibrasi pompa
- * @param voltageMetricKey metrik tegangan yang dicatat bersama kalibrasi pompa
+ * Pengaturan kalibrasi (Protokol-Data.md §7-§8). {@code readingMaxAge}: umur maksimum pembacaan untuk mengisi otomatis
+ * sampel lab, uji drift, atau tegangan bus kalibrasi pompa.
  */
 @ConfigurationProperties(prefix = "app.calibration")
 public record CalibrationProperties(
@@ -24,10 +21,7 @@ public record CalibrationProperties(
         reminders = reminders == null ? new Reminders(null, null, null) : reminders;
     }
 
-    /**
-     * @param metricKeys sensor yang wajib diuji drift (probe EC/pH)
-     * @param maxAge jarak maksimum antar uji; Protokol §7: mingguan
-     */
+    /** Sensor wajib uji drift (probe EC/pH); {@code maxAge} antar uji, Protokol §7: mingguan. */
     public record DriftCheck(List<String> metricKeys, Duration maxAge) {
         public DriftCheck {
             metricKeys = metricKeys == null ? List.of() : List.copyOf(metricKeys);
@@ -35,11 +29,7 @@ public record CalibrationProperties(
         }
     }
 
-    /**
-     * @param types tipe aktuator yang debitnya dikalibrasi (pompa peristaltik)
-     * @param maxAge jarak maksimum antar kalibrasi; Protokol §8: bulanan
-     * @param minTrials ulangan minimum bila ulangan dicatat satu per satu; Protokol §8: 3
-     */
+    /** Tipe pompa yang dikalibrasi; {@code maxAge} Protokol §8: bulanan; {@code minTrials} Protokol §8: 3 ulangan. */
     public record Pump(List<String> types, Duration maxAge, Integer minTrials) {
         public Pump {
             types = types == null

@@ -7,13 +7,7 @@ import java.util.List;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-/**
- * Adaptor antara entitas {@link User} dan Spring Security.
- *
- * <p>Menyimpan identifikasi akun (<i>account id</i>) sehingga kode pada tingkat bawah (misalnya 
- * audit perintah <i>actuator</i>) dapat mencatat pihak yang mengajukan permintaan aksi tanpa 
- * perlu melakukan pencarian ulang ke basis data.
- */
+/** Adaptor {@link User} ke Spring Security; menyimpan account id agar audit perintah aktuator tidak query ulang. */
 
 public class AppUserDetails implements UserDetails {
 

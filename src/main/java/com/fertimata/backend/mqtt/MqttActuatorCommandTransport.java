@@ -9,12 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-/**
- * MQTT adapter for the actuator command port.
- *
- * <p>This is the seam between the domain and the messaging world: it is the only class that knows a
- * command becomes JSON on a topic. {@code ActuatorCommandService} knows none of that.
- */
+/** MQTT adapter for the command port: the only class that knows a command becomes JSON on a topic. */
 @Component
 public class MqttActuatorCommandTransport implements ActuatorCommandTransport {
 

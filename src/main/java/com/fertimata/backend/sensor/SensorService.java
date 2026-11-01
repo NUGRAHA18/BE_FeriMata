@@ -24,12 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Sensor registry and measurement queries.
- *
- * <p>A sensor is a row, never a class or a table. Adding pH, EC, NPK or anything else the hardware
- * team decides on later is a data change, which is the whole point of this design.
- */
+/** Sensor registry and queries; a sensor is a row, so a new kind (pH, EC, NPK...) is a data change. */
 @Service
 public class SensorService {
 
@@ -138,13 +133,7 @@ public class SensorService {
         return publishUpdated(sensor);
     }
 
-    /**
-     * Finds the sensor a telemetry metric belongs to.
-     *
-     * <p>When the metric is unknown the configured policy decides: either create a disabled
-     * placeholder so the value can still be stored and reviewed later, or report it as unmapped so
-     * the caller can record a partial ingest. Neither path invents a unit or a sensor type.
-     */
+    /** Maps a metric to its sensor; unknown ones get a disabled placeholder or are reported unmapped (config). Nothing invented. */
     @Transactional
     public Optional<Sensor> resolveForMetric(Device device, String metricKey) {
         Optional<Sensor> existing = sensorRepository.findByDeviceIdAndMetricKey(device.getId(), metricKey);

@@ -4,12 +4,8 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
-/**
- * Konfigurasi utama aplikasi. 
- *
- * di mana mock messaging dan simulator telementri hanya aktif pada mode tersebut. 
- * Nilai ini tidak mengontrol logika bisnis, melainkan menentukan bean infrastruktur yang dibuat
- */
+/** Konfigurasi utama; mode menentukan bean infrastruktur (mock messaging, simulator telemetri hanya di
+ * DEVELOPMENT), bukan logika bisnis. */
 @Validated
 @ConfigurationProperties(prefix = "app")
 public record AppProperties(@NotNull Mode mode) {

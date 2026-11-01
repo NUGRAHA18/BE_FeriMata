@@ -1,11 +1,6 @@
 package com.fertimata.backend.mqtt;
 
-/**
- * The logical channels the backend speaks over the broker.
- *
- * <p>Direction is part of the contract: the backend only ever publishes on {@link #COMMAND} and only
- * ever consumes the rest.
- */
+/** Logical broker channels; the backend only publishes on {@link #COMMAND} and only consumes the rest. */
 public enum TopicKind {
     /** Device to backend: sensor measurements. */
     TELEMETRY(false),
@@ -17,10 +12,7 @@ public enum TopicKind {
     COMMAND_ACK(false),
     /** Device to backend: results from the vision model. */
     AI(false),
-    /**
-     * Device to backend: a fault the edge agent detected itself - an SSR stuck on, a dry-running
-     * pump, a dosing loop that did not converge. The backend stores it; it does not re-derive it.
-     */
+    /** Device to backend: a fault the edge detected itself (SSR stuck on, dry-running pump); stored, not re-derived. */
     ALERT(false);
 
     private final boolean outbound;
