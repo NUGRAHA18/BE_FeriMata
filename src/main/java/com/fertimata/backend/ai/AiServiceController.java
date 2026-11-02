@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -43,6 +44,11 @@ public class AiServiceController {
 
     private static final int MAX_PHOTOS = 10;
 
+    /** Indikator "AI berjalan" di aplikasi dipanggil berkala dari banyak layar; satu cek ke AI per jangka ini. */
+    static final Duration STATUS_CACHE = Duration.ofSeconds(15);
+
+    private final AtomicReference<Status> lastStatus = new AtomicReference<>();
+
     private final AiServiceClient client;
     private final Clock clock;
 
@@ -67,8 +73,21 @@ public class AiServiceController {
                     Object result) {}
 
     @GetMapping("/status")
-    @Operation(summary = "Is the AI service up?", description = "Calls GET /health of the AI service. Never fails; check reachable.")
+    @Operation(
+            summary = "Is the AI service up?",
+            description = "Calls GET /health of the AI service (5 s timeout); the answer is reused for 15 s "
+                    + "(see checkedAt). Never fails; check reachable.")
     public Status status() {
+        Status cached = lastStatus.get();
+        if (cached != null && Duration.between(cached.checkedAt(), clock.instant()).compareTo(STATUS_CACHE) < 0) {
+            return cached;
+        }
+        Status fresh = check();
+        lastStatus.set(fresh);
+        return fresh;
+    }
+
+    private Status check() {
         Instant start = clock.instant();
         if (!client.configured()) {
             return new Status(false, false, "AI_SERVICE_URL is empty", null, start);

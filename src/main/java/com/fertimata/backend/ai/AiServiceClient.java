@@ -49,6 +49,9 @@ public class AiServiceClient {
     private static final List<String> PHOTO_EXTENSIONS = List.of(".jpg", ".jpeg", ".png");
     private static final int PHOTO_SEARCH_DEPTH = 6;
 
+    /** {@code /health} dipanggil berkala untuk indikator di aplikasi: jangan menunggu selama YOLO (timeout utama). */
+    static final Duration HEALTH_TIMEOUT = Duration.ofSeconds(5);
+
     /** Durasi pompa dosing (detik) dari fuzzy fertigasi AI. */
     public record Dose(double nitrogenSeconds, double phosphorusSeconds, double potassiumSeconds) {}
 
@@ -83,19 +86,26 @@ public class AiServiceClient {
     private final CapturesProperties captures;
     private final Clock clock;
     private final RestClient restClient;
+    private final RestClient healthClient;
 
     public AiServiceClient(AiServiceProperties properties, CapturesProperties captures, Clock clock) {
         this.properties = properties;
         this.captures = captures;
         this.clock = clock;
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
-                HttpClient.newBuilder().connectTimeout(properties.timeout()).build());
-        factory.setReadTimeout(properties.timeout());
         // Buffered: body dikirim dengan Content-Length, bukan chunked. Server WSGI (Flask/Werkzeug) bisa
         // membaca body chunked sebagai kosong, sehingga form sampai ke AI tanpa isi.
         this.restClient = RestClient.builder()
-                .requestFactory(new BufferingClientHttpRequestFactory(factory))
+                .requestFactory(new BufferingClientHttpRequestFactory(factory(properties.timeout())))
                 .build();
+        Duration healthTimeout = properties.timeout().compareTo(HEALTH_TIMEOUT) < 0 ? properties.timeout() : HEALTH_TIMEOUT;
+        this.healthClient = RestClient.builder().requestFactory(factory(healthTimeout)).build();
+    }
+
+    private static JdkClientHttpRequestFactory factory(Duration timeout) {
+        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(
+                HttpClient.newBuilder().connectTimeout(timeout).build());
+        factory.setReadTimeout(timeout);
+        return factory;
     }
 
     public boolean configured() {
@@ -215,7 +225,7 @@ public class AiServiceClient {
         Map<?, ?> response;
         requireConfigured();
         try {
-            response = restClient.get().uri(url(HEALTH)).retrieve().body(Map.class);
+            response = healthClient.get().uri(url(HEALTH)).retrieve().body(Map.class);
         } catch (RestClientResponseException ex) {
             throw answered(ex);
         } catch (RestClientException ex) {
