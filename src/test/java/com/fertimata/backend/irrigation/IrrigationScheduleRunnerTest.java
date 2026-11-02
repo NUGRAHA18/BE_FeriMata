@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -17,6 +18,7 @@ import com.fertimata.backend.actuator.safety.SafetyInterlockException;
 import com.fertimata.backend.alert.AlertService;
 import com.fertimata.backend.alert.AlertType;
 import com.fertimata.backend.alert.NewAlert;
+import com.fertimata.backend.fertilization.FertilizationCoordinator;
 import com.fertimata.backend.support.TestFixtures;
 import java.time.Clock;
 import java.time.Duration;
@@ -59,6 +61,9 @@ class IrrigationScheduleRunnerTest {
     @Mock
     private IrrigationDurationResolver durations;
 
+    @Mock
+    private FertilizationCoordinator fertilization;
+
     private IrrigationScheduleRunner runner;
     private Actuator pump;
 
@@ -70,9 +75,59 @@ class IrrigationScheduleRunnerTest {
                 alertService,
                 new IrrigationProperties(true, "DIST-PUMP", Duration.ofSeconds(30), Duration.ofMinutes(15), null),
                 durations,
+                fertilization,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         pump = TestFixtures.actuator(9L, TestFixtures.device(1L, "PANEL-01"), "DIST-PUMP");
-        when(schedules.zone()).thenReturn(WIB);
+        lenient().when(schedules.zone()).thenReturn(WIB);
+        lenient().when(fertilization.beforeIrrigation(any(), any(), any()))
+                .thenReturn(FertilizationCoordinator.Decision.PROCEED);
+    }
+
+    @Test
+    @DisplayName("a session that starts a fertilization waits: the pump stays off and the schedule says WAITING")
+    void fertilizationDefersWatering() {
+        when(schedules.due(TODAY, LocalTime.of(6, 2))).thenReturn(List.of(new IrrigationScheduleService.Due(1L, LocalTime.of(6, 0), 300)));
+        when(schedules.claim(1L, TODAY, NOW)).thenReturn(true);
+        when(fertilization.beforeIrrigation(1L, TODAY, NOW)).thenReturn(FertilizationCoordinator.Decision.DEFERRED);
+
+        runner.runDue(NOW);
+
+        verify(commandService, never()).issueSystemCommand(any(), any());
+        verify(schedules).record(eq(1L), eq(TODAY), eq(NOW), eq(IrrigationSchedule.RunResult.WAITING), eq("FERTILIZING"),
+                anyString(), isNull());
+    }
+
+    @Test
+    @DisplayName("a failing fertilization check never stops the watering")
+    void fertilizationErrorStillWaters() {
+        when(schedules.due(TODAY, LocalTime.of(6, 2))).thenReturn(List.of(new IrrigationScheduleService.Due(1L, LocalTime.of(6, 0), 300)));
+        when(schedules.claim(1L, TODAY, NOW)).thenReturn(true);
+        when(fertilization.beforeIrrigation(1L, TODAY, NOW)).thenThrow(new IllegalStateException("boom"));
+        when(schedules.pump()).thenReturn(Optional.of(pump));
+        when(durations.resolve(300, null))
+                .thenReturn(new IrrigationDurationResolver.Decision(300, IrrigationDurationResolver.Source.MANUAL, null, null));
+        when(commandResponse.commandUid()).thenReturn("cmd-9");
+        when(commandService.issueSystemCommand(eq(9L), any())).thenReturn(commandResponse);
+
+        runner.runDue(NOW);
+
+        verify(commandService).issueSystemCommand(eq(9L), any());
+    }
+
+    @Test
+    @DisplayName("after fertilization the waiting session waters, even past the schedule's grace")
+    void startsAfterFertilization() {
+        when(schedules.find(1L)).thenReturn(Optional.of(new IrrigationScheduleService.Due(1L, LocalTime.of(5, 0), 300)));
+        when(schedules.pump()).thenReturn(Optional.of(pump));
+        when(durations.resolve(300, null))
+                .thenReturn(new IrrigationDurationResolver.Decision(60, IrrigationDurationResolver.Source.AI, null, null));
+        when(commandResponse.commandUid()).thenReturn("cmd-3");
+        when(commandService.issueSystemCommand(eq(9L), any())).thenReturn(commandResponse);
+
+        runner.startAfterFertilization(1L, TODAY, NOW);
+
+        verify(schedules).record(1L, TODAY, NOW, IrrigationSchedule.RunResult.STARTED, null, null, "cmd-3", 60,
+                IrrigationDurationResolver.Source.AI);
     }
 
     @Test

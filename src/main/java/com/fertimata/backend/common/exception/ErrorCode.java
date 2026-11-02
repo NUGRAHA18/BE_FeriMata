@@ -15,6 +15,8 @@ public enum ErrorCode {
     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED),
     ACCESS_DENIED(HttpStatus.FORBIDDEN),
     MESSAGING_ERROR(HttpStatus.SERVICE_UNAVAILABLE),
+    /** Layanan AI tim AI tidak diatur, tidak bisa dihubungi, atau menjawab error. */
+    AI_SERVICE_ERROR(HttpStatus.BAD_GATEWAY),
     DATABASE_ERROR(HttpStatus.INTERNAL_SERVER_ERROR),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 

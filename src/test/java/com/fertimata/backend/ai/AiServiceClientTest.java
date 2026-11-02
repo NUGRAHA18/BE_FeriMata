@@ -39,15 +39,29 @@ class AiServiceClientTest {
     private final AtomicReference<String> contentLength = new AtomicReference<>();
     private final AtomicReference<String> transferEncoding = new AtomicReference<>();
 
+    private final AtomicReference<String> method = new AtomicReference<>();
+    private final AtomicReference<String> uri = new AtomicReference<>();
+
     private String serve(int status, String json) throws IOException {
+        return serve(AiServiceClient.RUN_IRRIGATION, status, json);
+    }
+
+    private String serve(String path, int status, String json) throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        server.createContext(AiServiceClient.RUN_IRRIGATION, exchange -> {
+        server.createContext(path, exchange -> {
+            method.set(exchange.getRequestMethod());
+            uri.set(exchange.getRequestURI().toString());
             contentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
             contentLength.set(exchange.getRequestHeaders().getFirst("Content-Length"));
             transferEncoding.set(exchange.getRequestHeaders().getFirst("Transfer-Encoding"));
             requestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.ISO_8859_1));
             byte[] out = json.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
+            if (status == 204) {
+                exchange.sendResponseHeaders(204, -1);
+                exchange.close();
+                return;
+            }
             exchange.sendResponseHeaders(status, out.length);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(out);
@@ -136,5 +150,84 @@ class AiServiceClientTest {
         assertThatThrownBy(() -> client("http://127.0.0.1:1").irrigationSeconds(form))
                 .isInstanceOf(AiServiceException.class)
                 .hasMessageContaining("ph");
+    }
+
+    @Test
+    @DisplayName("run_fertilization: posts the form and reads durasi_pompa_n/p/k")
+    void fertilizationDose() throws Exception {
+        String url = serve(AiServiceClient.RUN_FERTILIZATION, 200,
+                "{\"status\":\"success\",\"result\":{\"durasi_pompa_n\":12.5,\"durasi_pompa_p\":0,\"durasi_pompa_k\":150.0}}");
+        Map<String, BigDecimal> form = new LinkedHashMap<>();
+        form.put("ec", new BigDecimal("1.8"));
+        form.put("hst", BigDecimal.valueOf(20));
+
+        AiServiceClient.Dose dose = client(url).fertilizationDose(form);
+
+        assertThat(dose).isEqualTo(new AiServiceClient.Dose(12.5, 0, 150));
+        assertThat(requestBody.get()).contains("name=\"ec\"").contains("1.8");
+    }
+
+    @Test
+    @DisplayName("GET /api/schedule/fertilization: rows with id and interval_days")
+    void fertilizationIntervals() throws Exception {
+        String url = serve(AiServiceClient.FERTILIZATION_SCHEDULE, 200,
+                "{\"status\":\"success\",\"result\":[{\"id\":4,\"interval_days\":7}]}");
+
+        assertThat(client(url).fertilizationIntervals())
+                .containsExactly(new AiServiceClient.FertilizationInterval(4, 7));
+        assertThat(method.get()).isEqualTo("GET");
+    }
+
+    @Test
+    @DisplayName("PUT /api/schedule/fertilization sends JSON {id, interval} and reads data")
+    void updateInterval() throws Exception {
+        String url = serve(AiServiceClient.FERTILIZATION_SCHEDULE, 200,
+                "{\"status\":\"success\",\"data\":{\"id\":4,\"interval_days\":5},\"message\":\"ok\"}");
+
+        assertThat(client(url).updateFertilizationInterval(4, 5))
+                .isEqualTo(new AiServiceClient.FertilizationInterval(4, 5));
+        assertThat(method.get()).isEqualTo("PUT");
+        assertThat(contentType.get()).startsWith("application/json");
+        assertThat(requestBody.get()).contains("\"id\":4").contains("\"interval\":5");
+    }
+
+    @Test
+    @DisplayName("DELETE /api/schedule/fertilization/{id} accepts the AI's 204")
+    void deleteInterval() throws Exception {
+        String url = serve(AiServiceClient.FERTILIZATION_SCHEDULE, 204, "");
+
+        client(url).deleteFertilizationInterval(4);
+
+        assertThat(method.get()).isEqualTo("DELETE");
+        assertThat(uri.get()).isEqualTo("/api/schedule/fertilization/4");
+    }
+
+    @Test
+    @DisplayName("history rows are passed through with the limit")
+    void history() throws Exception {
+        String url = serve("/api/history/irrigation", 200,
+                "{\"status\":\"success\",\"result\":[{\"id\":\"a1\",\"watering_duration\":48.7}]}");
+
+        assertThat(client(url).history(AiServiceClient.HistoryKind.IRRIGATION, 5))
+                .containsExactly(Map.of("id", "a1", "watering_duration", 48.7));
+        assertThat(uri.get()).isEqualTo("/api/history/irrigation?limit=5");
+    }
+
+    @Test
+    @DisplayName("an AI answer with status error is refused even with HTTP 200")
+    void statusError() throws Exception {
+        String url = serve(AiServiceClient.FERTILIZATION_SCHEDULE, 200, "{\"status\":\"error\",\"message\":\"db down\"}");
+
+        assertThatThrownBy(() -> client(url).fertilizationIntervals())
+                .isInstanceOf(AiServiceException.class)
+                .hasMessageContaining("db down");
+    }
+
+    @Test
+    @DisplayName("GET /health returns the message")
+    void health() throws Exception {
+        String url = serve(AiServiceClient.HEALTH, 200, "{\"message\":\"Running Melon AI System API\"}");
+
+        assertThat(client(url).health()).isEqualTo("Running Melon AI System API");
     }
 }

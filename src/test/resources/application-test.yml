@@ -35,6 +35,11 @@ app:
     check-interval: 1h
     grace: 15m
 
+  fertilization:
+    enabled: true
+    # Tests call FertilizationRunner.advance themselves.
+    check-interval: 1h
+
   ai:
     inputs:
       max-age: 15m

@@ -29,7 +29,9 @@ public class IrrigationSchedule extends AuditedEntity {
         /** Pompa tidak ditemukan/nonaktif atau perintah gagal terkirim. */
         FAILED,
         /** Backend tidak berjalan pada jam jadwal; siram tidak dikejar terlambat. */
-        MISSED
+        MISSED,
+        /** Menunggu pemupukan selesai (dosing + aduk); pompa siram dinyalakan setelahnya. */
+        WAITING
     }
 
     @Column(name = "time_of_day", nullable = false, unique = true)
