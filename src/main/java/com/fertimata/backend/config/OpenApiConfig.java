@@ -84,54 +84,6 @@ public class OpenApiConfig {
         return GroupedOpenApi.builder().group("semua").displayName("Semua endpoint").pathsToMatch("/**").build();
     }
 
-    /** Subset untuk layanan AI: /v3/api-docs/layanan-ai → openapi/fertimata-openapi-layanan-ai.json (koleksi Postman tim AI),
-     * mengikuti alurnya: login → input fuzzy → cari pompa → kirim perintah → tunggu hasil. */
-    @Bean
-    public GroupedOpenApi aiServiceEndpoints() {
-        return GroupedOpenApi.builder()
-                .group("layanan-ai")
-                .displayName("Layanan AI")
-                .pathsToMatch(
-                        "/api/auth/login",
-                        "/api/auth/refresh",
-                        "/api/ai/inputs",
-                        "/api/cultivation/active",
-                        "/api/actuators",
-                        "/api/actuators/*/status",
-                        "/api/actuators/*/commands",
-                        "/api/actuators/commands/*",
-                        "/actuator/health")
-                .addOpenApiCustomizer(openApi -> {
-                    // Layanan AI membaca foto langsung dari folder di Jetson, dan tidak mendaftarkan aktuator.
-                    openApi.getPaths().remove("/captures/{date}/{file}");
-                    PathItem actuators = openApi.getPaths().get("/api/actuators");
-                    if (actuators != null) {
-                        actuators.setPost(null);
-                    }
-                })
-                .addOpenApiCustomizer(openApi -> openApi.getInfo()
-                        .title("FertiMata Backend API: layanan AI")
-                        .description(
-                                """
-                                Endpoint yang dibutuhkan layanan AI (penjadwal dosing/campur pupuk di Jetson).
-                                Alamat di Jetson: `http://127.0.0.1` (lewat Caddy, bukan port 8080). Login dengan
-                                akun OPERATOR khusus layanan (mis. `layanan-ai`, dibuat admin).
-
-                                1. `POST /api/auth/login` → `accessToken` (60 menit); perpanjang dengan `POST /api/auth/refresh`.
-                                2. `GET /api/ai/inputs` → nilai sensor dengan nama field persis seperti form fuzzy
-                                   (`fertilization`, `irrigation`) + `hst`. Jangan dosing bila `readyForFertilization`
-                                   false (data kosong/basi > 15 menit, atau tanggal tanam belum diisi); alasannya di `problems`.
-                                3. `GET /api/actuators` → `id` pompa (`DOSING-N/P/K`, `STIRRER`) dan `maxRunSeconds`.
-                                4. `POST /api/actuators/{id}/commands` `{"command":"ON","parameters":{"durationSeconds":N}}`
-                                   → `commandUid`. Ditolak aturan keselamatan → 409 dengan `details.interlock`.
-                                5. `GET /api/actuators/commands/{commandUid}` sampai `EXECUTED` atau `FAILED`
-                                   (`failureCode`, mis. NO_RESPONSE, INTERLOCK_POWER); lalu langkah berikutnya.
-
-                                Penyiraman terjadwal dikerjakan backend, bukan layanan AI.
-                                """))
-                .build();
-    }
-
     /** Foto patroli kamera, disajikan read-only dari folder edge (CAPTURES_DIR). */
     private static PathItem capturesPath() {
         return new PathItem().get(new Operation()

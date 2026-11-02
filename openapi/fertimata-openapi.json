@@ -18,10 +18,10 @@
     },
     {
       "url": "http://{host}",
-      "description": "Jetson lewat Caddy (same-origin)",
+      "description": "Jetson lewat Caddy (same-origin). Tailscale 100.73.72.13 atau IP LAN kampus (bisa berubah).",
       "variables": {
         "host": {
-          "default": "192.168.1.105"
+          "default": "100.73.72.13"
         }
       }
     }
@@ -40,16 +40,20 @@
       "description": "Sign-in, session refresh, password change"
     },
     {
-      "name": "Cultivation",
-      "description": "Transplant date, days after transplant (HST) and growth phase"
-    },
-    {
       "name": "Dashboard",
       "description": "Aggregated view for the operator console"
     },
     {
       "name": "Users",
       "description": "Account management (ADMIN only)"
+    },
+    {
+      "name": "AI service",
+      "description": "Pass-through to the AI team's service (AI_SERVICE_URL)"
+    },
+    {
+      "name": "Cultivation",
+      "description": "Sowing date, days after sowing (HST) and growth phase"
     },
     {
       "name": "Devices",
@@ -66,6 +70,10 @@
     {
       "name": "Pump calibration",
       "description": "Peristaltic pump flow and dispensed volume (Protokol-Data.md §6, §8)"
+    },
+    {
+      "name": "Fertilization",
+      "description": "Automatic fertilization: the interval and the N/P/K doses come from the AI service; the backend runs it before the first watering session of a due day"
     },
     {
       "name": "AI detections",
@@ -168,19 +176,143 @@
         }
       }
     },
+    "/api/fertilization/schedule": {
+      "get": {
+        "tags": [
+          "Fertilization"
+        ],
+        "summary": "Fertilization interval (from the AI service), last and next fertilization",
+        "description": "Never fails because of the AI service: aiReachable=false with aiError instead.",
+        "operationId": "schedule",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FertilizationSchedule"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Fertilization"
+        ],
+        "summary": "Set 'fertilize every N days'",
+        "description": "Stored in the AI service (its dosing schedule), creating it when missing. 502 when the AI service cannot be used.",
+        "operationId": "setInterval",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FertilizationIntervalRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FertilizationSchedule"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Fertilization"
+        ],
+        "summary": "Stop automatic fertilization",
+        "description": "Deletes the dosing schedule in the AI service. 502 when the AI service cannot be used.",
+        "operationId": "deleteInterval",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FertilizationSchedule"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/cultivation/transplant-date": {
       "put": {
         "tags": [
           "Cultivation"
         ],
-        "summary": "Set the greenhouse transplant date",
-        "description": "The only cultivation setting in the app: HST and the growth phase on the dashboard are counted from this date.",
-        "operationId": "setTransplantDate",
+        "summary": "Set the sowing date (HST day 0)",
+        "description": "The only cultivation setting in the app: HST and the growth phase on the dashboard are counted from this date (sowing = HST day 0). /transplant-date and a body field transplantDate are deprecated aliases.",
+        "operationId": "setSowingDate",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TransplantDateRequest"
+                "$ref": "#/components/schemas/SowingDateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/CycleStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/cultivation/sowing-date": {
+      "put": {
+        "tags": [
+          "Cultivation"
+        ],
+        "summary": "Set the sowing date (HST day 0)",
+        "description": "The only cultivation setting in the app: HST and the growth phase on the dashboard are counted from this date (sowing = HST day 0). /transplant-date and a body field transplantDate are deprecated aliases.",
+        "operationId": "setSowingDate_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SowingDateRequest"
               }
             }
           },
@@ -1471,6 +1603,75 @@
         ]
       }
     },
+    "/api/ai/detect/{kind}": {
+      "post": {
+        "tags": [
+          "AI service"
+        ],
+        "summary": "Run the AI vision model on leaf photos",
+        "description": "kind = deficiency or disease. Upload up to 10 photos as multipart 'images'; without uploads the newest patrol photos are used. 502 when the AI service cannot be used.",
+        "operationId": "detect",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "images": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              }
+            },
+            "*/*": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "images": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiDetectionRun"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/actuators": {
       "get": {
         "tags": [
@@ -2422,7 +2623,7 @@
           "Plants"
         ],
         "summary": "Delete a plant",
-        "description": "AI detections that pointed at it are kept without the plant. Deleting the LAST plant also clears the transplant date (GET /api/cultivation/active becomes 404), so the next season starts again from adding the first plant.",
+        "description": "AI detections that pointed at it are kept without the plant. Deleting the LAST plant also clears the sowing date (GET /api/cultivation/active becomes 404), so the next season starts again from adding the first plant.",
         "operationId": "delete_1",
         "parameters": [
           {
@@ -2438,6 +2639,58 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/fertilization/runs": {
+      "get": {
+        "tags": [
+          "Fertilization"
+        ],
+        "summary": "Fertilization runs, newest first",
+        "description": "Including skipped and failed attempts.",
+        "operationId": "runs",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2585,7 +2838,7 @@
           "Cultivation"
         ],
         "summary": "Today's HST and growth phase",
-        "description": "HST counted from the transplant date, the phase in effect with its EC target (phases follow the AI team's fuzzy), and the next phase. 404 when the transplant date is not set.",
+        "description": "HST counted from the sowing date, the phase in effect with its EC target (phases follow the AI team's fuzzy), and the next phase. 404 when the sowing date is not set.",
         "operationId": "active",
         "responses": {
           "200": {
@@ -2769,6 +3022,33 @@
         ]
       }
     },
+    "/api/ai/status": {
+      "get": {
+        "tags": [
+          "AI service"
+        ],
+        "summary": "Is the AI service up?",
+        "description": "Calls GET /health of the AI service (5 s timeout); the answer is reused for 15 s (see checkedAt). Never fails; check reachable.",
+        "operationId": "status_1",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiServiceStatus"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/ai/inputs": {
       "get": {
         "tags": [
@@ -2784,6 +3064,59 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/AiInputs"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/ai/history/{kind}": {
+      "get": {
+        "tags": [
+          "AI service"
+        ],
+        "summary": "Inference history kept by the AI service",
+        "description": "kind = irrigation or fertilization. Rows as stored by the AI (newest first): every run_irrigation/run_fertilization call is recorded there, including ones the backend did not execute. 502 when the AI service cannot be used.",
+        "operationId": "history_1",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 30,
+              "maximum": 500,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
                 }
               }
             }
@@ -2917,7 +3250,7 @@
         ],
         "summary": "Get the last state the device reported for an actuator",
         "description": "Null until the device reports one; the backend does not infer state from commands.",
-        "operationId": "status_1",
+        "operationId": "status_2",
         "parameters": [
           {
             "name": "id",
@@ -3043,6 +3376,45 @@
         ]
       }
     },
+    "/api/sensors/{sensorId}/drift-checks/{checkId}": {
+      "delete": {
+        "tags": [
+          "Sensor calibration"
+        ],
+        "summary": "Delete a wrongly entered drift check",
+        "operationId": "deleteDriftCheck",
+        "parameters": [
+          {
+            "name": "sensorId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "checkId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/sensors/{sensorId}/calibration-samples/{sampleId}": {
       "delete": {
         "tags": [
@@ -3085,17 +3457,188 @@
   },
   "components": {
     "schemas": {
-      "TransplantDateRequest": {
+      "FertilizationIntervalRequest": {
         "type": "object",
         "properties": {
-          "transplantDate": {
+          "intervalDays": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Fertilize every N days",
+            "example": 7,
+            "maximum": 60,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "intervalDays"
+        ]
+      },
+      "FertilizationRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "runDate": {
             "type": "string",
             "format": "date",
+            "description": "Farm date (WIB)"
+          },
+          "irrigationScheduleId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Watering time that waited for this run; null when deleted"
+          },
+          "status": {
+            "type": "string",
+            "description": "IN_PROGRESS; DONE (AI dose poured, also when the AI said 0 s); PARTIAL (some pumps ran, counted as fertilized so it is not doubled); SKIPPED (not poured: stale sensor data, pump missing); FAILED (not poured: AI unusable, command refused, backend down)",
+            "enum": [
+              "IN_PROGRESS",
+              "DONE",
+              "PARTIAL",
+              "SKIPPED",
+              "FAILED"
+            ]
+          },
+          "step": {
+            "type": "string",
+            "description": "Next step while IN_PROGRESS: PHOSPHORUS, POTASSIUM, MIXING, IRRIGATE",
+            "enum": [
+              "PHOSPHORUS",
+              "POTASSIUM",
+              "MIXING",
+              "IRRIGATE"
+            ]
+          },
+          "reasonCode": {
+            "type": "string",
+            "description": "AI_UNAVAILABLE, AI_INPUTS_NOT_READY, AI_NO_PHOTO, PUMP_UNAVAILABLE, AI_NO_DOSE_NEEDED, AI_CAPPED, BACKEND_DOWN, or an interlock code (BACKUP_POWER, FLOAT_LOW, ...). Translate this, not message.",
+            "example": "AI_INPUTS_NOT_READY"
+          },
+          "message": {
+            "type": "string",
+            "description": "Technical detail"
+          },
+          "intervalDays": {
+            "type": "integer",
+            "format": "int32",
+            "description": "AI dosing interval at the time of the run"
+          },
+          "aiNitrogenSeconds": {
+            "type": "number",
+            "description": "Seconds asked by the AI fuzzy fertilization"
+          },
+          "aiPhosphorusSeconds": {
+            "type": "number"
+          },
+          "aiPotassiumSeconds": {
+            "type": "number"
+          },
+          "nitrogenSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Seconds sent to the pump (AI value capped to the pump's maxRunSeconds)"
+          },
+          "phosphorusSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "potassiumSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stirrerSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stirrerCommandUid": {
+            "type": "string"
+          },
+          "nitrogenCommandUid": {
+            "type": "string"
+          },
+          "phosphorusCommandUid": {
+            "type": "string"
+          },
+          "potassiumCommandUid": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FertilizationSchedule": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "app.fertilization.enabled: false = watering is never preceded by fertilization"
+          },
+          "aiConfigured": {
+            "type": "boolean",
+            "description": "AI_SERVICE_URL is set"
+          },
+          "aiReachable": {
+            "type": "boolean",
+            "description": "The AI schedule could be read; when false intervalDays is unknown and aiError says why"
+          },
+          "aiError": {
+            "type": "string"
+          },
+          "aiScheduleId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Row id in the AI service's dosing_schedules"
+          },
+          "intervalDays": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Fertilize every N days (from the AI service); null = no fertilization schedule",
+            "example": 7
+          },
+          "lastFertilizedDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Farm date of the last DONE/PARTIAL run; null = never"
+          },
+          "lastFertilizedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextDueDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Fertilization happens before the first watering session on or after this date; null when there is no AI schedule"
+          },
+          "activeRun": {
+            "$ref": "#/components/schemas/FertilizationRun",
+            "description": "The run in progress, if any"
+          }
+        }
+      },
+      "SowingDateRequest": {
+        "type": "object",
+        "properties": {
+          "sowingDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Sowing date; HST day 0",
             "example": "2026-09-12"
           }
         },
         "required": [
-          "transplantDate"
+          "sowingDate"
         ]
       },
       "CycleStatus": {
@@ -3176,9 +3719,16 @@
           "variety": {
             "type": "string"
           },
+          "sowingDate": {
+            "type": "string",
+            "format": "date",
+            "description": "HST day 0"
+          },
           "transplantDate": {
             "type": "string",
-            "format": "date"
+            "format": "date",
+            "deprecated": true,
+            "description": "Deprecated alias of sowingDate"
           },
           "expectedHarvestDate": {
             "type": "string",
@@ -3940,6 +4490,7 @@
           "durationSeconds": {
             "type": "integer",
             "format": "int32",
+            "description": "Fallback duration: used when the AI fuzzy irrigation cannot be used (or always when app.irrigation.duration-source=MANUAL). Normally the AI decides the duration at run time.",
             "example": 300
           },
           "enabled": {
@@ -3964,7 +4515,8 @@
               "STARTED",
               "SKIPPED",
               "FAILED",
-              "MISSED"
+              "MISSED",
+              "WAITING"
             ]
           },
           "lastReasonCode": {
@@ -3979,6 +4531,16 @@
           "lastCommandUid": {
             "type": "string",
             "description": "Command of the last run; GET /api/actuators/commands/{commandUid}"
+          },
+          "lastDurationSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Seconds actually sent to the pump on the last run; null when it did not get that far"
+          },
+          "lastDurationSource": {
+            "type": "string",
+            "description": "AI (from the AI fuzzy irrigation), FALLBACK (AI unusable; lastReasonCode says why: AI_NOT_CONFIGURED, AI_INPUTS_NOT_READY, AI_NO_PHOTO, AI_UNAVAILABLE) or MANUAL",
+            "example": "AI"
           }
         }
       },
@@ -4268,6 +4830,23 @@
           "newPassword"
         ]
       },
+      "AiDetectionRun": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "example": "deficiency"
+          },
+          "photos": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Photos sent: uploaded ones, else the newest patrol photos"
+          },
+          "result": {
+            "description": "As answered by the AI: deficiency = percent per class, disease = list of labels"
+          }
+        }
+      },
       "ActuatorRegistrationRequest": {
         "type": "object",
         "properties": {
@@ -4370,6 +4949,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "pumpCalibratable": {
+            "type": "boolean",
+            "description": "True when this actuator's type takes a pump flow calibration (app.calibration.pump.types); the calibration endpoints reject the others"
           },
           "description": {
             "type": "string"
@@ -5212,9 +5795,15 @@
           "cycleName": {
             "type": "string"
           },
-          "transplantDate": {
+          "sowingDate": {
             "type": "string",
             "format": "date"
+          },
+          "transplantDate": {
+            "type": "string",
+            "format": "date",
+            "deprecated": true,
+            "description": "Deprecated alias of sowingDate"
           },
           "hst": {
             "type": "integer",
@@ -5338,6 +5927,32 @@
           }
         }
       },
+      "AiServiceStatus": {
+        "type": "object",
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "description": "AI_SERVICE_URL is set"
+          },
+          "reachable": {
+            "type": "boolean",
+            "description": "GET /health answered"
+          },
+          "message": {
+            "type": "string",
+            "example": "Running Melon AI System API"
+          },
+          "latencyMs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Round trip of the health check; null when not reachable"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "AiInputReading": {
         "type": "object",
         "properties": {
@@ -5383,7 +5998,7 @@
           "hst": {
             "type": "integer",
             "format": "int32",
-            "description": "Days since the transplant date; null when it is not set in Settings"
+            "description": "Days since the sowing date; null when it is not set in Settings"
           },
           "phaseCode": {
             "type": "string",
