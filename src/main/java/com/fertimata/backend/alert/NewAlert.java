@@ -72,9 +72,30 @@ public record NewAlert(
             return this;
         }
 
+        /** Title and message are cut to their column sizes, so a long detail can never make raising fail. */
         public NewAlert build() {
             return new NewAlert(
-                    type, severity, title, message, source, relatedDevice, relatedSensor, relatedActuator, metadata);
+                    type,
+                    severity,
+                    truncate(title, TITLE_LENGTH),
+                    truncate(message, MESSAGE_LENGTH),
+                    source,
+                    relatedDevice,
+                    relatedSensor,
+                    relatedActuator,
+                    metadata);
         }
+    }
+
+    /** Column sizes of {@code alert.title} and {@code alert.message}. */
+    static final int TITLE_LENGTH = 160;
+
+    static final int MESSAGE_LENGTH = 1000;
+
+    private static String truncate(String value, int max) {
+        if (value == null || value.length() <= max) {
+            return value;
+        }
+        return value.substring(0, max - 1) + "…";
     }
 }
