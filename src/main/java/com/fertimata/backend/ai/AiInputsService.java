@@ -19,7 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Menyusun input fuzzy AI dari bacaan terbaru; bacaan hilang atau lebih tua dari {@code app.ai.inputs.max-age} jadi
- * null dan form tidak siap (S9). Backend tidak menolak perintah karena ini; keputusan dosing milik layanan AI. */
+ * null dan form tidak siap (S9). Pemupukan otomatis backend tidak dosing bila form pupuk tidak siap
+ * ({@code FertilizationCoordinator}); perintah manual tidak ditolak karena ini. */
 @Service
 public class AiInputsService {
 

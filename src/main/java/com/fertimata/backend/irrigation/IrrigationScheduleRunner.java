@@ -11,6 +11,7 @@ import com.fertimata.backend.alert.AlertSource;
 import com.fertimata.backend.alert.AlertType;
 import com.fertimata.backend.alert.NewAlert;
 import com.fertimata.backend.common.exception.ApiException;
+import com.fertimata.backend.fertilization.FertilizationCoordinator;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,12 +38,15 @@ public class IrrigationScheduleRunner {
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm");
     static final String PUMP_UNAVAILABLE = "PUMP_UNAVAILABLE";
     static final String BACKEND_DOWN = "BACKEND_DOWN";
+    static final String FERTILIZING = "FERTILIZING";
+    static final String FERTILIZATION_IN_PROGRESS = "FERTILIZATION_IN_PROGRESS";
 
     private final IrrigationScheduleService schedules;
     private final ActuatorCommandService commandService;
     private final AlertService alertService;
     private final IrrigationProperties properties;
     private final IrrigationDurationResolver durations;
+    private final FertilizationCoordinator fertilization;
     private final Clock clock;
 
     public IrrigationScheduleRunner(
@@ -51,12 +55,14 @@ public class IrrigationScheduleRunner {
             AlertService alertService,
             IrrigationProperties properties,
             IrrigationDurationResolver durations,
+            FertilizationCoordinator fertilization,
             Clock clock) {
         this.schedules = schedules;
         this.commandService = commandService;
         this.alertService = alertService;
         this.properties = properties;
         this.durations = durations;
+        this.fertilization = fertilization;
         this.clock = clock;
         log.info(
                 "Scheduled irrigation {} (pump {}, checked every {}, duration from {})",
@@ -92,7 +98,46 @@ public class IrrigationScheduleRunner {
                 log.warn("Irrigation at {} missed by {}", due.time(), late);
                 continue;
             }
+            FertilizationCoordinator.Decision fertilizing = fertilizeFirst(due, today, now);
+            if (fertilizing == FertilizationCoordinator.Decision.DEFERRED) {
+                schedules.record(due.id(), today, now, IrrigationSchedule.RunResult.WAITING, FERTILIZING,
+                        "Fertilizing first; watering starts after mixing.", null);
+                log.info("Irrigation at {} waits for fertilization", HH_MM.format(due.time()));
+                continue;
+            }
+            if (fertilizing == FertilizationCoordinator.Decision.BUSY) {
+                schedules.record(due.id(), today, now, IrrigationSchedule.RunResult.SKIPPED, FERTILIZATION_IN_PROGRESS,
+                        "Fertilization in progress; the session waiting for it waters afterwards.", null);
+                log.info("Irrigation at {} skipped: fertilization in progress", HH_MM.format(due.time()));
+                continue;
+            }
             start(due, today, now);
+        }
+    }
+
+    /** Sesi siram yang ditunda pemupukan: dijalankan setelah aduk selesai (tanpa batas grace jam jadwal). */
+    public void startAfterFertilization(Long scheduleId, LocalDate date, Instant now) {
+        Optional<IrrigationScheduleService.Due> due = schedules.find(scheduleId);
+        if (due.isEmpty()) {
+            log.info("Watering schedule {} waiting for fertilization was deleted or disabled", scheduleId);
+            return;
+        }
+        start(due.get(), date, now);
+    }
+
+    /** Sesi siram yang ditunda pemupukan, tetapi backend mati terlalu lama: tidak dikejar. */
+    public void missedAfterFertilization(Long scheduleId, LocalDate date, Instant now) {
+        schedules.record(scheduleId, date, now, IrrigationSchedule.RunResult.MISSED, BACKEND_DOWN,
+                "Backend was not running while fertilizing; watering was not chased.", null);
+    }
+
+    /** Pemupukan tidak boleh menggagalkan siram: error apa pun = siram seperti biasa. */
+    private FertilizationCoordinator.Decision fertilizeFirst(IrrigationScheduleService.Due due, LocalDate today, Instant now) {
+        try {
+            return fertilization.beforeIrrigation(due.id(), today, now);
+        } catch (RuntimeException ex) {
+            log.error("Fertilization check before irrigation {} failed; watering as usual", HH_MM.format(due.time()), ex);
+            return FertilizationCoordinator.Decision.PROCEED;
         }
     }
 

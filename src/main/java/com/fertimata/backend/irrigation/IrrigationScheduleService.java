@@ -115,6 +115,14 @@ public class IrrigationScheduleService {
                 .toList();
     }
 
+    /** Satu jadwal aktif sebagai {@link Due}, untuk sesi yang menunggu pemupukan. */
+    @Transactional(readOnly = true)
+    public Optional<Due> find(Long id) {
+        return repository.findById(id)
+                .filter(IrrigationSchedule::isEnabled)
+                .map(s -> new Due(s.getId(), s.getTimeOfDay(), s.getDurationSeconds()));
+    }
+
     /** Menandai jadwal diambil hari ini sebelum perintah dikirim agar restart tidak menyiram dua kali; false bila tak berlaku. */
     @Transactional
     public boolean claim(Long id, LocalDate today, Instant at) {

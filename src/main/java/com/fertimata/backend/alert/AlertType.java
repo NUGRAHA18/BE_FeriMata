@@ -27,6 +27,12 @@ public final class AlertType {
     /** Durasi siram dari fuzzy AI tidak bisa dipakai; jadwal berjalan dengan durasi cadangan petani. */
     public static final String IRRIGATION_AI_FALLBACK = "IRRIGATION_AI_FALLBACK";
 
+    /** Pemupukan yang jatuh tempo tidak menuang apa pun (data basi, AI tidak bisa dipakai, perintah ditolak). */
+    public static final String FERTILIZATION_SKIPPED = "FERTILIZATION_SKIPPED";
+
+    /** Pemupukan berhenti di tengah: sebagian pompa sempat menuang. */
+    public static final String FERTILIZATION_PARTIAL = "FERTILIZATION_PARTIAL";
+
     /** A sensor in the drift-check list has not been checked against a standard solution recently. */
     public static final String DRIFT_CHECK_DUE = "DRIFT_CHECK_DUE";
 

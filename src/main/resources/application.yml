@@ -40,6 +40,12 @@ spring:
   # map validation-details yang kosong nggak ikut dirender.
     default-property-inclusion: always
 
+  # Foto daun untuk POST /api/ai/detect/{kind} (paling banyak 10 foto).
+  servlet:
+    multipart:
+      max-file-size: ${UPLOAD_MAX_FILE_SIZE:10MB}
+      max-request-size: ${UPLOAD_MAX_REQUEST_SIZE:60MB}
+
 server:
   port: ${SERVER_PORT:8080}
   error:
@@ -194,10 +200,32 @@ app:
     # dipakai sebagai cadangan bila AI tidak bisa dipakai. MANUAL: selalu isian petani.
     duration-source: ${IRRIGATION_DURATION_SOURCE:AI}
 
+  # Pemupukan otomatis (keputusan 2 Nov 2026), mengikuti aturan main layanan AI: jarak hari dari jadwal dosing AI,
+  # dosing pada sesi siram pertama yang jatuh tempo, dosis N/P/K dari fuzzy fertigasi AI. Backend menjalankan:
+  # pompa aduk ON, pompa N -> P -> K bergantian (edge hanya mengizinkan satu pompa dosing), aduk, lalu siram.
+  fertilization:
+    enabled: ${FERTILIZATION_ENABLED:true}
+    check-interval: 5s
+    # Lama aduk setelah pompa K. Pompa aduk dibatasi max-run-seconds 600 (juga max_on_s edge): N+P+K bisa 450 s,
+    # jadi sisa aduk paling sedikit sekitar 150 s.
+    mix-seconds: ${FERTILIZATION_MIX_SECONDS:120}
+    pump-gap: 5s
+    # Edge melaporkan OFF kurang dari 1 s setelah timer habis; jeda ini sebelum pompa siram.
+    settle: 15s
+    # Menunggu ACK + laporan OFF pompa sebelumnya paling lama ini, lalu dosing dihentikan (siram tetap dicoba).
+    step-timeout: 90s
+    grace: 15m
+    actuators:
+      nitrogen: DOSING-N
+      phosphorus: DOSING-P
+      potassium: DOSING-K
+      stirrer: STIRRER
+
   # GET /api/ai/inputs: input fuzzy layanan AI. Nama field = form di Swagger layanan AI (Ai-code);
   # nilai = metric key sensor backend. Ubah di sini bila tim AI mengganti arti sebuah field.
   ai:
-    # Layanan AI tim AI (Flask, Ai-code/main.py, port 5000). Kosong = tidak dipanggil (siram memakai durasi cadangan).
+    # Layanan AI tim AI (repo Fertigation_Service, folder ai-code). gunicorn (start.sh) memakai port 5555, flask dev 5000.
+    # Kosong = tidak dipanggil (siram memakai durasi cadangan, pemupukan otomatis tidak jalan).
     service:
       base-url: ${AI_SERVICE_URL:}
       timeout: ${AI_SERVICE_TIMEOUT:90s}
