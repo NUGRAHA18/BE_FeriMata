@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -108,9 +109,10 @@ public class AiServiceClient {
      * membatasi siram bila ada penyakit.
      *
      * @param form field form {@code run_irrigation} dari {@link AiInputsResponse#irrigation()}; semua wajib terisi
+     * @throws NoPhotoException tidak ada foto patroli dalam {@code photo-max-age}; AI tidak dipanggil
      */
     public double irrigationSeconds(Map<String, BigDecimal> form) throws AiServiceException {
-        List<Path> photos = recentPhotos();
+        List<Path> photos = requirePhotos(properties.photoMaxAge());
         Map<?, ?> result = result(postForm(RUN_IRRIGATION, "Irrigation", form, photos), RUN_IRRIGATION);
         double seconds = number(result, "durasi_irigasi", RUN_IRRIGATION);
         log.info("AI fuzzy irrigation: {} s ({} photo(s) sent)", seconds, photos.size());
@@ -124,9 +126,10 @@ public class AiServiceClient {
      * Layanan AI mencatat setiap panggilan ini di riwayatnya sendiri.
      *
      * @param form field form {@code run_fertilization} dari {@link AiInputsResponse#fertilization()}; semua wajib terisi
+     * @throws NoPhotoException tidak ada foto patroli dalam {@code fertilization-photo-max-age}; AI tidak dipanggil
      */
     public Dose fertilizationDose(Map<String, BigDecimal> form) throws AiServiceException {
-        List<Path> photos = recentPhotos();
+        List<Path> photos = requirePhotos(properties.fertilizationPhotoMaxAge());
         Map<?, ?> result = result(postForm(RUN_FERTILIZATION, "Fertilization", form, photos), RUN_FERTILIZATION);
         Dose dose = new Dose(
                 number(result, "durasi_pompa_n", RUN_FERTILIZATION),
@@ -221,8 +224,22 @@ public class AiServiceClient {
         return response == null ? null : String.valueOf(response.get("message"));
     }
 
-    /** Foto patroli terbaru (paling banyak {@code app.ai.service.irrigation-photos}), terbaru dulu. */
+    /** AI menolak permintaan tanpa foto, jadi tanpa foto segar AI tidak dipanggil. */
+    private List<Path> requirePhotos(Duration maxAge) throws NoPhotoException {
+        List<Path> photos = recentPhotos(maxAge);
+        if (photos.isEmpty()) {
+            throw new NoPhotoException("No patrol photo from the last %s; the AI service needs at least one"
+                    .formatted(maxAge));
+        }
+        return photos;
+    }
+
+    /** Foto patroli dalam {@code photo-max-age} (paling banyak {@code irrigation-photos}), terbaru dulu. */
     public List<Path> recentPhotos() {
+        return recentPhotos(properties.photoMaxAge());
+    }
+
+    private List<Path> recentPhotos(Duration maxAge) {
         if (!captures.enabled() || properties.irrigationPhotos() <= 0) {
             return List.of();
         }
@@ -230,7 +247,7 @@ public class AiServiceClient {
         if (!Files.isDirectory(root)) {
             return List.of();
         }
-        Instant oldest = clock.instant().minus(properties.photoMaxAge());
+        Instant oldest = clock.instant().minus(maxAge);
         try (Stream<Path> files = Files.walk(root, PHOTO_SEARCH_DEPTH)) {
             return files.filter(Files::isRegularFile)
                     .filter(AiServiceClient::isPhoto)

@@ -10,6 +10,7 @@ import com.fertimata.backend.ai.AiInputsResponse;
 import com.fertimata.backend.ai.AiInputsService;
 import com.fertimata.backend.ai.AiServiceClient;
 import com.fertimata.backend.ai.AiServiceException;
+import com.fertimata.backend.ai.NoPhotoException;
 import com.fertimata.backend.irrigation.IrrigationDurationResolver.Decision;
 import com.fertimata.backend.irrigation.IrrigationDurationResolver.Source;
 import java.math.BigDecimal;
@@ -95,6 +96,18 @@ class IrrigationDurationResolverTest {
                 .containsExactly(300, Source.FALLBACK, IrrigationDurationResolver.AI_INPUTS_NOT_READY);
         assertThat(decision.detail()).contains("soil_a.moisture");
         verify(aiClient, never()).irrigationSeconds(any());
+    }
+
+    @Test
+    @DisplayName("no fresh patrol photo: falls back with AI_NO_PHOTO (not 'AI unavailable')")
+    void noPhotoFallsBack() throws Exception {
+        when(aiClient.configured()).thenReturn(true);
+        when(aiInputs.inputs()).thenReturn(inputs(true, List.of()));
+        when(aiClient.irrigationSeconds(FORM)).thenThrow(new NoPhotoException("No patrol photo from the last PT24H"));
+
+        assertThat(resolver(Source.AI).resolve(300, null))
+                .extracting(Decision::seconds, Decision::source, Decision::reasonCode)
+                .containsExactly(300, Source.FALLBACK, IrrigationDurationResolver.AI_NO_PHOTO);
     }
 
     @Test

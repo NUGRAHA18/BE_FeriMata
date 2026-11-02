@@ -19,6 +19,7 @@ import com.fertimata.backend.ai.AiInputsResponse;
 import com.fertimata.backend.ai.AiInputsService;
 import com.fertimata.backend.ai.AiServiceClient;
 import com.fertimata.backend.ai.AiServiceException;
+import com.fertimata.backend.ai.NoPhotoException;
 import com.fertimata.backend.alert.AlertService;
 import com.fertimata.backend.alert.AlertType;
 import com.fertimata.backend.alert.NewAlert;
@@ -170,6 +171,24 @@ class FertilizationCoordinatorTest {
         assertThat(run.getValue().getStatus()).isEqualTo(FertilizationRun.Status.SKIPPED);
         assertThat(run.getValue().getReasonCode()).isEqualTo("AI_INPUTS_NOT_READY");
         verify(aiClient, never()).fertilizationDose(any());
+        ArgumentCaptor<NewAlert> alert = ArgumentCaptor.forClass(NewAlert.class);
+        verify(alertService).raise(alert.capture());
+        assertThat(alert.getValue().type()).isEqualTo(AlertType.FERTILIZATION_SKIPPED);
+    }
+
+    @Test
+    @DisplayName("no fresh patrol photo: SKIPPED with AI_NO_PHOTO, no pump touched, watering goes ahead")
+    void noPhotoSkip() throws Exception {
+        dueWithReadyInputs();
+        when(aiClient.fertilizationDose(any())).thenThrow(new NoPhotoException("No patrol photo from the last PT72H"));
+
+        assertThat(coordinator.beforeIrrigation(1L, TODAY, NOW)).isEqualTo(FertilizationCoordinator.Decision.PROCEED);
+
+        ArgumentCaptor<FertilizationRun> run = ArgumentCaptor.forClass(FertilizationRun.class);
+        verify(repository).save(run.capture());
+        assertThat(run.getValue().getStatus()).isEqualTo(FertilizationRun.Status.SKIPPED);
+        assertThat(run.getValue().getReasonCode()).isEqualTo(FertilizationCoordinator.AI_NO_PHOTO);
+        verify(commandService, never()).issueSystemCommand(any(), any());
         ArgumentCaptor<NewAlert> alert = ArgumentCaptor.forClass(NewAlert.class);
         verify(alertService).raise(alert.capture());
         assertThat(alert.getValue().type()).isEqualTo(AlertType.FERTILIZATION_SKIPPED);

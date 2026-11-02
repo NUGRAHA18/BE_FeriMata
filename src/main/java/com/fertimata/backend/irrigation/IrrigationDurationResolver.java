@@ -4,6 +4,7 @@ import com.fertimata.backend.ai.AiInputsResponse;
 import com.fertimata.backend.ai.AiInputsService;
 import com.fertimata.backend.ai.AiServiceClient;
 import com.fertimata.backend.ai.AiServiceException;
+import com.fertimata.backend.ai.NoPhotoException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -20,6 +21,8 @@ public class IrrigationDurationResolver {
     static final String AI_NOT_CONFIGURED = "AI_NOT_CONFIGURED";
     static final String AI_INPUTS_NOT_READY = "AI_INPUTS_NOT_READY";
     static final String AI_UNAVAILABLE = "AI_UNAVAILABLE";
+    /** Tidak ada foto patroli segar; AI menolak tanpa foto, jadi tidak dipanggil. */
+    static final String AI_NO_PHOTO = "AI_NO_PHOTO";
     static final String AI_NO_WATER_NEEDED = "AI_NO_WATER_NEEDED";
     static final String AI_CAPPED = "AI_CAPPED";
 
@@ -65,6 +68,8 @@ public class IrrigationDurationResolver {
         double aiSeconds;
         try {
             aiSeconds = aiClient.irrigationSeconds(inputs.irrigation());
+        } catch (NoPhotoException ex) {
+            return fallback(fallbackSeconds, AI_NO_PHOTO, ex.getMessage());
         } catch (AiServiceException ex) {
             return fallback(fallbackSeconds, AI_UNAVAILABLE, ex.getMessage());
         }

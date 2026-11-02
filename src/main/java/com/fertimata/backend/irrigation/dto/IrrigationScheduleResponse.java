@@ -32,5 +32,5 @@ public record IrrigationScheduleResponse(
         @Schema(
                         example = "AI",
                         description = "AI (from the AI fuzzy irrigation), FALLBACK (AI unusable; lastReasonCode says why: "
-                                + "AI_NOT_CONFIGURED, AI_INPUTS_NOT_READY, AI_UNAVAILABLE) or MANUAL")
+                                + "AI_NOT_CONFIGURED, AI_INPUTS_NOT_READY, AI_NO_PHOTO, AI_UNAVAILABLE) or MANUAL")
                 String lastDurationSource) {}
