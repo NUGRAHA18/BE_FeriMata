@@ -224,14 +224,17 @@ app:
   # GET /api/ai/inputs: input fuzzy layanan AI. Nama field = form di Swagger layanan AI (Ai-code);
   # nilai = metric key sensor backend. Ubah di sini bila tim AI mengganti arti sebuah field.
   ai:
-    # Layanan AI tim AI (repo Fertigation_Service, folder ai-code). gunicorn (start.sh) memakai port 5555, flask dev 5000.
+    # Layanan AI tim AI (repo Fertigation_Service, folder ai-code). Di Jetson: port 5000 (start.sh Jetson; repo menulis 5555).
     # Kosong = tidak dipanggil (siram memakai durasi cadangan, pemupukan otomatis tidak jalan).
     service:
       base-url: ${AI_SERVICE_URL:}
       timeout: ${AI_SERVICE_TIMEOUT:90s}
-      # Foto patroli terbaru yang ikut dikirim ke run_irrigation untuk deteksi penyakit.
+      # Foto patroli terbaru yang ikut dikirim ke run_irrigation / run_fertilization (YOLO). AI wajib menerima
+      # minimal 1 foto; tanpa foto segar AI tidak dipanggil (AI_NO_PHOTO).
       irrigation-photos: ${AI_IRRIGATION_PHOTOS:3}
       photo-max-age: ${AI_IRRIGATION_PHOTO_MAX_AGE:24h}
+      # Pupuk jarang (tiap beberapa hari) dan kondisi daun berubah lambat, jadi foto boleh lebih tua.
+      fertilization-photo-max-age: ${AI_FERTILIZATION_PHOTO_MAX_AGE:72h}
     inputs:
       # Lebih tua dari ini = basi; field-nya null dan form tidak siap (S9).
       max-age: ${AI_INPUTS_MAX_AGE:15m}

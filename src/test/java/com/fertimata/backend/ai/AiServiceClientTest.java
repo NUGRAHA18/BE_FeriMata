@@ -80,7 +80,7 @@ class AiServiceClientTest {
 
     private AiServiceClient client(String baseUrl) {
         return new AiServiceClient(
-                new AiServiceProperties(baseUrl, Duration.ofSeconds(5), 2, Duration.ofHours(24)),
+                new AiServiceProperties(baseUrl, Duration.ofSeconds(5), 2, Duration.ofHours(24), Duration.ofHours(72)),
                 new CapturesProperties(captures.toString(), null),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
@@ -98,6 +98,11 @@ class AiServiceClientTest {
         Files.write(file, new byte[] {1, 2, 3});
         Files.setLastModifiedTime(file, FileTime.from(modified));
         return file;
+    }
+
+    /** AI menolak tanpa foto, jadi panggilan yang diharapkan sampai ke AI butuh satu foto segar. */
+    private void freshPhoto() throws IOException {
+        photo("2026-10-31/fresh.jpg", NOW.minus(Duration.ofMinutes(30)));
     }
 
     @Test
@@ -126,6 +131,7 @@ class AiServiceClientTest {
     @Test
     @DisplayName("an error answer from the AI service becomes an AiServiceException with its message")
     void errorAnswer() throws Exception {
+        freshPhoto();
         String url = serve(400, "{\"status\":\"error\",\"message\":\"Input yang dimasukkan harus berupa string angka\"}");
 
         assertThatThrownBy(() -> client(url).irrigationSeconds(form()))
@@ -136,14 +142,16 @@ class AiServiceClientTest {
 
     @Test
     @DisplayName("an unreachable AI service becomes an AiServiceException")
-    void unreachable() {
+    void unreachable() throws Exception {
+        freshPhoto();
         assertThatThrownBy(() -> client("http://127.0.0.1:1").irrigationSeconds(form()))
                 .isInstanceOf(AiServiceException.class);
     }
 
     @Test
     @DisplayName("an empty field is refused before calling the AI")
-    void emptyField() {
+    void emptyField() throws Exception {
+        freshPhoto();
         Map<String, BigDecimal> form = form();
         form.put("ph", null);
 
@@ -153,8 +161,32 @@ class AiServiceClientTest {
     }
 
     @Test
+    @DisplayName("no patrol photo: NoPhotoException and the AI is not called (it refuses requests without a photo)")
+    void noPhoto() throws Exception {
+        photo("2026-10-28/old.jpg", NOW.minus(Duration.ofDays(4)));
+        String url = serve(200, "{\"status\":\"success\",\"result\":{\"durasi_irigasi\":47.25}}");
+
+        assertThatThrownBy(() -> client(url).irrigationSeconds(form())).isInstanceOf(NoPhotoException.class);
+        assertThatThrownBy(() -> client(url).fertilizationDose(form())).isInstanceOf(NoPhotoException.class);
+        assertThat(requestBody.get()).isNull();
+    }
+
+    @Test
+    @DisplayName("fertilization accepts photos up to fertilization-photo-max-age (72 h); irrigation only 24 h")
+    void fertilizationPhotoAge() throws Exception {
+        photo("2026-10-29/two-days.jpg", NOW.minus(Duration.ofHours(48)));
+        String url = serve(AiServiceClient.RUN_FERTILIZATION, 200,
+                "{\"status\":\"success\",\"result\":{\"durasi_pompa_n\":1,\"durasi_pompa_p\":2,\"durasi_pompa_k\":3}}");
+
+        assertThatThrownBy(() -> client(url).irrigationSeconds(form())).isInstanceOf(NoPhotoException.class);
+        assertThat(client(url).fertilizationDose(form())).isEqualTo(new AiServiceClient.Dose(1, 2, 3));
+        assertThat(requestBody.get()).contains("filename=\"two-days.jpg\"");
+    }
+
+    @Test
     @DisplayName("run_fertilization: posts the form and reads durasi_pompa_n/p/k")
     void fertilizationDose() throws Exception {
+        freshPhoto();
         String url = serve(AiServiceClient.RUN_FERTILIZATION, 200,
                 "{\"status\":\"success\",\"result\":{\"durasi_pompa_n\":12.5,\"durasi_pompa_p\":0,\"durasi_pompa_k\":150.0}}");
         Map<String, BigDecimal> form = new LinkedHashMap<>();

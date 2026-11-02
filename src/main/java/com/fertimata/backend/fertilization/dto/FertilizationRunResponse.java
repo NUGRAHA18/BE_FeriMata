@@ -19,7 +19,7 @@ public record FertilizationRunResponse(
         @Schema(description = "Next step while IN_PROGRESS: PHOSPHORUS, POTASSIUM, MIXING, IRRIGATE") FertilizationRun.Step step,
         @Schema(
                         example = "AI_INPUTS_NOT_READY",
-                        description = "AI_UNAVAILABLE, AI_INPUTS_NOT_READY, PUMP_UNAVAILABLE, AI_NO_DOSE_NEEDED, AI_CAPPED, "
+                        description = "AI_UNAVAILABLE, AI_INPUTS_NOT_READY, AI_NO_PHOTO, PUMP_UNAVAILABLE, AI_NO_DOSE_NEEDED, AI_CAPPED, "
                                 + "BACKEND_DOWN, or an interlock code (BACKUP_POWER, FLOAT_LOW, ...). Translate this, not message.")
                 String reasonCode,
         @Schema(description = "Technical detail") String message,

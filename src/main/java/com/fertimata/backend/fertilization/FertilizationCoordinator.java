@@ -9,6 +9,7 @@ import com.fertimata.backend.ai.AiInputsResponse;
 import com.fertimata.backend.ai.AiInputsService;
 import com.fertimata.backend.ai.AiServiceClient;
 import com.fertimata.backend.ai.AiServiceException;
+import com.fertimata.backend.ai.NoPhotoException;
 import com.fertimata.backend.alert.AlertService;
 import com.fertimata.backend.alert.AlertSeverity;
 import com.fertimata.backend.alert.AlertSource;
@@ -48,6 +49,8 @@ public class FertilizationCoordinator {
 
     static final String AI_UNAVAILABLE = "AI_UNAVAILABLE";
     static final String AI_INPUTS_NOT_READY = "AI_INPUTS_NOT_READY";
+    /** Tidak ada foto patroli segar; AI menolak tanpa foto, jadi tidak dipanggil. */
+    static final String AI_NO_PHOTO = "AI_NO_PHOTO";
     static final String PUMP_UNAVAILABLE = "PUMP_UNAVAILABLE";
     static final String AI_NO_DOSE_NEEDED = "AI_NO_DOSE_NEEDED";
     static final String AI_CAPPED = "AI_CAPPED";
@@ -137,6 +140,9 @@ public class FertilizationCoordinator {
         AiServiceClient.Dose dose;
         try {
             dose = aiClient.fertilizationDose(inputs.fertilization());
+        } catch (NoPhotoException ex) {
+            notPoured(scheduleId, today, now, FertilizationRun.Status.SKIPPED, AI_NO_PHOTO, ex.getMessage(), interval);
+            return Decision.PROCEED;
         } catch (AiServiceException ex) {
             notPoured(scheduleId, today, now, FertilizationRun.Status.FAILED, AI_UNAVAILABLE, ex.getMessage(), interval);
             return Decision.PROCEED;
