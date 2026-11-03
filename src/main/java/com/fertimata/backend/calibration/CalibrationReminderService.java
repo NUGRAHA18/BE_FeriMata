@@ -17,7 +17,10 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Pengingat uji drift mingguan (Protokol §7) dan kalibrasi pompa bulanan (§8): INFO, sekali sampai ditangani. */
+/**
+ * Pengingat kalibrasi pompa bulanan (§8): INFO, sekali sampai ditangani, lalu diam selama {@code pump.reminder-snooze}.
+ * Pengingat uji drift (§7) hanya untuk sensor di {@code drift-check.metric-keys}, yang bawaannya kosong.
+ */
 @Service
 public class CalibrationReminderService {
 
@@ -104,7 +107,7 @@ public class CalibrationReminderService {
                     .device(actuator.getDevice())
                     .actuator(actuator)
                     .metadata(metadata)
-                    .build());
+                    .build(), now.minus(properties.pump().reminderSnooze()));
             raised += created ? 1 : 0;
         }
         return raised;

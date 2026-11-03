@@ -145,15 +145,19 @@ app:
     # Nilai sensor/tegangan yang diisi otomatis (sampel lab, uji drift, kalibrasi pompa) tidak boleh lebih tua dari ini.
     reading-max-age: ${CALIBRATION_READING_MAX_AGE:15m}
     voltage-metric-key: mains.voltage
-    # Protokol-Data.md s7 langkah 5: probe EC/pH dicek dengan larutan standar tiap minggu.
+    # Protokol-Data.md s7 langkah 5: probe EC/pH dicek dengan larutan standar tiap minggu. Sejak 3 Nov 2026
+    # kalibrasi sensor tidak dipakai (terlalu riset untuk petani), jadi tidak ada pengingat DRIFT_CHECK_DUE.
+    # Isi mis. [tank.ec, tank.ph, soil_a.ec, soil_a.ph] untuk menyalakannya lagi; endpoint uji drift tetap ada.
     drift-check:
-      metric-keys: [tank.ec, tank.ph, soil_a.ec, soil_a.ph]
+      metric-keys: []
       max-age: ${CALIBRATION_DRIFT_MAX_AGE:7d}
     # Protokol-Data.md s8: debit pompa peristaltik, minimal 3 ulangan, rekalibrasi bulanan.
     pump:
       types: [DOSING_PUMP]
       max-age: ${CALIBRATION_PUMP_MAX_AGE:30d}
       min-trials: 3
+      # Pengingat PUMP_CALIBRATION_DUE yang sudah ditandai ditangani tidak muncul lagi selama ini.
+      reminder-snooze: ${CALIBRATION_PUMP_REMINDER_SNOOZE:7d}
     reminders:
       enabled: ${CALIBRATION_REMINDERS_ENABLED:true}
       interval: 6h

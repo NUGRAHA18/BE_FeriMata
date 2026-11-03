@@ -17,11 +17,14 @@ public record CalibrationProperties(
         readingMaxAge = readingMaxAge == null ? Duration.ofMinutes(15) : readingMaxAge;
         voltageMetricKey = voltageMetricKey == null || voltageMetricKey.isBlank() ? "mains.voltage" : voltageMetricKey;
         driftCheck = driftCheck == null ? new DriftCheck(null, null) : driftCheck;
-        pump = pump == null ? new Pump(null, null, null) : pump;
+        pump = pump == null ? new Pump(null, null, null, null) : pump;
         reminders = reminders == null ? new Reminders(null, null, null) : reminders;
     }
 
-    /** Sensor wajib uji drift (probe EC/pH); {@code maxAge} antar uji, Protokol §7: mingguan. */
+    /**
+     * Sensor yang diberi pengingat uji drift (probe EC/pH); {@code maxAge} antar uji, Protokol §7: mingguan. Kosong =
+     * tanpa pengingat (bawaan sejak 3 Nov 2026: kalibrasi sensor tidak dipakai petani).
+     */
     public record DriftCheck(List<String> metricKeys, Duration maxAge) {
         public DriftCheck {
             metricKeys = metricKeys == null ? List.of() : List.copyOf(metricKeys);
@@ -29,9 +32,13 @@ public record CalibrationProperties(
         }
     }
 
-    /** Tipe pompa yang dikalibrasi; {@code maxAge} Protokol §8: bulanan; {@code minTrials} Protokol §8: 3 ulangan. */
-    public record Pump(List<String> types, Duration maxAge, Integer minTrials) {
+    /**
+     * Tipe pompa yang dikalibrasi; {@code maxAge} Protokol §8: bulanan; {@code minTrials} Protokol §8: 3 ulangan;
+     * {@code reminderSnooze}: pengingat yang sudah ditandai ditangani tidak dimunculkan lagi selama ini.
+     */
+    public record Pump(List<String> types, Duration maxAge, Integer minTrials, Duration reminderSnooze) {
         public Pump {
+            reminderSnooze = reminderSnooze == null ? Duration.ofDays(7) : reminderSnooze;
             types = types == null
                     ? List.of("DOSING_PUMP")
                     : types.stream().map(t -> t.trim().toUpperCase(Locale.ROOT)).toList();

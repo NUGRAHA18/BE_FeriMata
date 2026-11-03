@@ -2,6 +2,7 @@ package com.fertimata.backend.calibration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,7 +62,7 @@ class CalibrationReminderServiceTest {
                 null,
                 null,
                 new CalibrationProperties.DriftCheck(List.of("tank.ec"), Duration.ofDays(7)),
-                new CalibrationProperties.Pump(List.of("DOSING_PUMP"), Duration.ofDays(30), 3),
+                new CalibrationProperties.Pump(List.of("DOSING_PUMP"), Duration.ofDays(30), 3, Duration.ofDays(7)),
                 null);
         service = new CalibrationReminderService(
                 sensorRepository,
@@ -73,7 +74,7 @@ class CalibrationReminderServiceTest {
                 Clock.fixed(NOW, ZoneOffset.UTC));
         device = TestFixtures.device(1L, "RIO-TANK-01");
         when(alertService.raiseOnceForSensor(any())).thenReturn(true);
-        when(alertService.raiseOnceForActuator(any())).thenReturn(true);
+        when(alertService.raiseOnceForActuator(any(), any())).thenReturn(true);
         when(actuatorRepository.findAllWithDevice()).thenReturn(List.of());
         when(sensorRepository.findAllWithDevice()).thenReturn(List.of());
     }
@@ -112,7 +113,7 @@ class CalibrationReminderServiceTest {
 
         assertThat(service.raiseDueReminders()).isZero();
         verify(alertService, never()).raiseOnceForSensor(any());
-        verify(alertService, never()).raiseOnceForActuator(any());
+        verify(alertService, never()).raiseOnceForActuator(any(), any());
     }
 
     @Test
@@ -127,7 +128,7 @@ class CalibrationReminderServiceTest {
 
         assertThat(service.raiseDueReminders()).isEqualTo(1);
         ArgumentCaptor<NewAlert> alert = ArgumentCaptor.forClass(NewAlert.class);
-        verify(alertService).raiseOnceForActuator(alert.capture());
+        verify(alertService).raiseOnceForActuator(alert.capture(), eq(NOW.minus(Duration.ofDays(7))));
         assertThat(alert.getValue().type()).isEqualTo(AlertType.PUMP_CALIBRATION_DUE);
         assertThat(alert.getValue().relatedActuator()).isSameAs(pump);
     }

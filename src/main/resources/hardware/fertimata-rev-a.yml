@@ -23,7 +23,7 @@ app:
     devices:
       # ---------------------------------------------------------------------------------------------
       - code: JETSON-01
-        name: Jetson Orin Nano (otak sistem)
+        name: Komputer utama
         type: EDGE_GATEWAY
         description: Komputer yang menjalankan frontend, backend, database, inferensi dan edge agent.
         metadata:
@@ -34,7 +34,7 @@ app:
         sensors:
           - code: TROLLEY-STATION
             metric-key: trolley.station
-            name: Posisi trolley (stasiun)
+            name: Posisi kereta kamera
             type: POSITION
             description: Nomor stasiun 1-10 dari hitungan magnet reed (tiap 600 mm); 0 = HOME.
             metadata:
@@ -42,21 +42,21 @@ app:
               stations: "10"
           - code: TROLLEY-HOME
             metric-key: trolley.home_limit
-            name: Limit HOME trolley (selatan)
+            name: Sensor ujung rel selatan (posisi awal)
             type: LIMIT_SWITCH
             description: Kontak NC - aktif berarti tertekan ATAU kabel putus.
             metadata:
               source: GPIO lewat papan GPIO, KW12 COM-NC
           - code: TROLLEY-END
             metric-key: trolley.end_limit
-            name: Limit END trolley (utara)
+            name: Sensor ujung rel utara
             type: LIMIT_SWITCH
             description: Kontak NC - aktif berarti tertekan ATAU kabel putus.
             metadata:
               source: GPIO lewat papan GPIO, KW12 COM-NC
           - code: JETSON-SOC-TEMP
             metric-key: jetson.soc_temperature
-            name: Suhu SoC Jetson
+            name: Suhu komputer utama
             type: TEMPERATURE
             unit: C
             description: Panel tanpa fan; Jetson hanya aman pada suhu lingkungan 0-35 C.
@@ -71,13 +71,13 @@ app:
             type: TROLLEY_PATROL
             description: START = jalan dari HOME ke stasiun 10 sambil memotret, lalu kembali. Jadwal malam tetap di edge.
           - code: TROLLEY-GOTO
-            name: Pindah trolley ke stasiun
+            name: Pindahkan kereta kamera
             type: TROLLEY_POSITION
             description: HOME = kembali ke limit selatan; GOTO_STATION dengan parameter station 1-10.
 
       # ---------------------------------------------------------------------------------------------
       - code: PZEM-01
-        name: PZEM-016 (PLN & arus panel)
+        name: Meteran listrik panel
         type: POWER_METER
         description: Di bus RS485 bersama, alamat 30. Diam sementara relay 20 menjawab = PLN padam.
         metadata:
@@ -119,7 +119,7 @@ app:
 
       # ---------------------------------------------------------------------------------------------
       - code: PANEL-01
-        name: Relay Modbus panel (alamat 20)
+        name: Panel saklar pompa & kamera
         type: MODBUS_IO
         description: Relay 4-ch di panel box.
         metadata:
@@ -127,7 +127,7 @@ app:
           modbusAddress: "20"
         actuators:
           - code: DIST-PUMP
-            name: Pompa distribusi 220 V
+            name: Pompa siram
             type: DISTRIBUTION_PUMP
             description: Lewat SSR-40DA. Tanpa timer mekanis - batas durasi dari software (§5.4).
             max-run-seconds: 900
@@ -136,7 +136,7 @@ app:
               channel: R0
               load: SSR-40DA -> Panasonic GP-129JXK-P2
           - code: CAMERA-PAN
-            name: Pan kamera (timur/barat)
+            name: Arah kamera (timur/barat)
             type: CAMERA_PAN
             description: ON = menghadap barat, OFF = timur. Berhenti sendiri di limit; tunggu 2 s sebelum memotret.
             metadata:
@@ -144,7 +144,7 @@ app:
               channel: R1
               load: MY4N #2 -> motor JGY-370 12 V
           - code: TROLLEY-RUN
-            name: Motor trolley (jalan)
+            name: Kereta kamera (jalan)
             type: TROLLEY_MOTOR
             description: Rel 6 m pada 0,15 m/s, perjalanan penuh kira-kira 40 detik.
             max-run-seconds: 60
@@ -152,7 +152,7 @@ app:
               modbusAddress: "20"
               channel: R2
           - code: TROLLEY-DIR
-            name: Motor trolley (arah)
+            name: Kereta kamera (arah)
             type: TROLLEY_DIRECTION
             description: ON = utara/END, OFF = selatan/HOME. Jangan dibalik saat motor berjalan - diurutkan oleh edge agent.
             metadata:
@@ -161,7 +161,7 @@ app:
 
       # ---------------------------------------------------------------------------------------------
       - code: GREENHOUSE-01
-        name: Sensor greenhouse (alamat 1, 3, 4)
+        name: Sensor udara & tanah greenhouse
         type: MODBUS_SENSOR_GROUP
         description: Sensor tanah, udara dan cahaya pada bus RS485 daisy chain.
         metadata:
@@ -191,7 +191,7 @@ app:
 
       # ---------------------------------------------------------------------------------------------
       - code: RIO-TANK-01
-        name: Kotak tangki fertigasi
+        name: Kotak kendali drum pupuk
         type: MODBUS_IO
         description: Kotak IP56 di bibir drum - relay 8-ch alamat 21, ADC 7-ch alamat 10, DS18B20 alamat 6.
         metadata:
@@ -203,7 +203,7 @@ app:
           - { code: TANK-WATER-TEMP, metric-key: tank.water_temperature, name: Suhu larutan, type: SOLUTION_TEMPERATURE, unit: C, description: "DS18B20 untuk kompensasi suhu EC dan pH.", metadata: { modbusAddress: "6" } }
           - code: FLOAT-LOW
             metric-key: tank.float_low_ok
-            name: Float LOW drum
+            name: Pelampung air drum
             type: LEVEL_SWITCH
             description: 1 = tertutup, air cukup. 0 = air rendah ATAU kabel putus - pompa distribusi, dosing dan aduk diblokir.
             metadata:
@@ -211,10 +211,10 @@ app:
               channel: IN1
         actuators:
           # 150 s = batas atas keluaran fuzzy pupuk AI (durasi_n/p/k 0-150 s).
-          - { code: DOSING-N, name: Pompa dosing N (Calnit), type: DOSING_PUMP, max-run-seconds: 150, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R0 } }
-          - { code: DOSING-P, name: Pompa dosing P (MKP), type: DOSING_PUMP, max-run-seconds: 150, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R1 } }
-          - { code: DOSING-K, name: Pompa dosing K (SOP), type: DOSING_PUMP, max-run-seconds: 150, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R2 } }
-          - { code: STIRRER, name: Pompa aduk drum, type: STIRRER, max-run-seconds: 600, description: "BLDC 24 V 22 W, menyala selama dosing + waktu aduk.", metadata: { modbusAddress: "21", channel: R4 } }
+          - { code: DOSING-N, name: Pompa pupuk N (Calnit), type: DOSING_PUMP, max-run-seconds: 150, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R0 } }
+          - { code: DOSING-P, name: Pompa pupuk P (MKP), type: DOSING_PUMP, max-run-seconds: 150, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R1 } }
+          - { code: DOSING-K, name: Pompa pupuk K (SOP), type: DOSING_PUMP, max-run-seconds: 150, description: "Debit dikalibrasi pada tegangan PLN normal.", metadata: { modbusAddress: "21", channel: R2 } }
+          - { code: STIRRER, name: Pengaduk drum pupuk, type: STIRRER, max-run-seconds: 600, description: "BLDC 24 V 22 W, menyala selama dosing + waktu aduk.", metadata: { modbusAddress: "21", channel: R4 } }
           - { code: EC-POWER, name: Daya papan EC, type: SENSOR_POWER, description: "Harus OFF saat membaca pH. Diurutkan oleh edge agent.", metadata: { modbusAddress: "21", channel: R5 } }
           # Campur pupuk otomatis dan jadwal siram/dosing adalah layanan terpisah tim AI (keputusan 28 Okt 2026).
           # Layanan itu memakai pompa di atas lewat POST /api/actuators/{id}/commands (ON + durationSeconds),
