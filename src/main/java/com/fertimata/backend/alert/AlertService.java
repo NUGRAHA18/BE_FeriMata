@@ -95,9 +95,21 @@ public class AlertService {
     /** Seperti {@link #raiseOnceForDevice}, tetapi per aktuator (mis. pengingat kalibrasi pompa). */
     @Transactional
     public boolean raiseOnceForActuator(NewAlert request) {
+        return raiseOnceForActuator(request, null);
+    }
+
+    /**
+     * Seperti {@link #raiseOnceForActuator(NewAlert)}, dan juga tidak dimunculkan bila alert yang sama ditandai ditangani
+     * setelah {@code acknowledgedSince} (pengingat yang ditutup petani tidak langsung muncul lagi).
+     */
+    @Transactional
+    public boolean raiseOnceForActuator(NewAlert request, Instant acknowledgedSince) {
         Long actuatorId = request.relatedActuator() == null ? null : request.relatedActuator().getId();
         if (actuatorId != null
-                && alertRepository.existsByTypeAndRelatedActuatorIdAndAcknowledgedFalse(request.type(), actuatorId)) {
+                && (alertRepository.existsByTypeAndRelatedActuatorIdAndAcknowledgedFalse(request.type(), actuatorId)
+                        || (acknowledgedSince != null
+                                && alertRepository.existsByTypeAndRelatedActuatorIdAndAcknowledgedAtAfter(
+                                        request.type(), actuatorId, acknowledgedSince)))) {
             return false;
         }
         raise(request);

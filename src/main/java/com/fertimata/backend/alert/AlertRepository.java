@@ -1,5 +1,6 @@
 package com.fertimata.backend.alert;
 
+import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,6 +19,8 @@ public interface AlertRepository extends JpaRepository<Alert, Long>, JpaSpecific
     boolean existsByTypeAndRelatedSensorIdAndAcknowledgedFalse(String type, Long sensorId);
 
     boolean existsByTypeAndRelatedActuatorIdAndAcknowledgedFalse(String type, Long actuatorId);
+
+    boolean existsByTypeAndRelatedActuatorIdAndAcknowledgedAtAfter(String type, Long actuatorId, Instant since);
 
     @Query("select a from Alert a where a.acknowledged = false order by a.severity desc, a.createdAt desc")
     List<Alert> findActive(Pageable pageable);

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fertimata.backend.actuator.domain.Actuator;
 import com.fertimata.backend.common.exception.BusinessRuleException;
 import com.fertimata.backend.common.exception.ResourceNotFoundException;
 import com.fertimata.backend.common.util.JsonSupport;
@@ -17,6 +18,7 @@ import com.fertimata.backend.user.User;
 import com.fertimata.backend.user.UserRepository;
 import com.fertimata.backend.websocket.RealtimeEventPublisher;
 import com.fertimata.backend.websocket.RealtimeEventType;
+import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -86,6 +88,29 @@ class AlertServiceTest {
 
         verify(alertRepository, never()).save(any());
         verify(realtimeEventPublisher, never()).publish(any(), any());
+    }
+
+    @Test
+    @DisplayName("a reminder acknowledged within the snooze window is not raised again")
+    void snoozedActuatorReminder() {
+        Device device = TestFixtures.device(1L, "RIO-TANK-01");
+        Actuator pump = new Actuator(device, "DOSING-N", "Pompa pupuk N", "DOSING_PUMP");
+        TestFixtures.setId(pump, 7L);
+        Instant since = Instant.parse("2026-10-27T00:00:00Z");
+        when(alertRepository.existsByTypeAndRelatedActuatorIdAndAcknowledgedAtAfter(
+                        AlertType.PUMP_CALIBRATION_DUE, 7L, since))
+                .thenReturn(true);
+
+        boolean created = alertService.raiseOnceForActuator(
+                NewAlert.builder(AlertType.PUMP_CALIBRATION_DUE, AlertSeverity.INFO)
+                        .title("Waktunya ukur ulang")
+                        .message("Ukur debit pompa")
+                        .actuator(pump)
+                        .build(),
+                since);
+
+        assertThat(created).isFalse();
+        verify(alertRepository, never()).save(any());
     }
 
     @Test
