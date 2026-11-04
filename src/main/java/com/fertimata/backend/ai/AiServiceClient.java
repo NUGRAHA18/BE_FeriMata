@@ -40,7 +40,6 @@ import org.springframework.web.client.RestClientResponseException;
 public class AiServiceClient {
 
     private static final Logger log = LoggerFactory.getLogger(AiServiceClient.class);
-    static final String RUN_IRRIGATION = "/api/fuzzy_sys/run_irrigation";
     static final String RUN_FERTILIZATION = "/api/fuzzy_sys/run_fertilization";
     static final String FERTILIZATION_SCHEDULE = "/api/schedule/fertilization";
     static final String HISTORY = "/api/history/";
@@ -110,23 +109,6 @@ public class AiServiceClient {
 
     public boolean configured() {
         return properties.configured();
-    }
-
-    /**
-     * Durasi siram (detik) dari fuzzy irigasi AI.
-     *
-     * <p>Foto patroli terbaru ikut dikirim: {@code run_irrigation} menjalankan deteksi penyakit dan
-     * membatasi siram bila ada penyakit.
-     *
-     * @param form field form {@code run_irrigation} dari {@link AiInputsResponse#irrigation()}; semua wajib terisi
-     * @throws NoPhotoException tidak ada foto patroli dalam {@code photo-max-age}; AI tidak dipanggil
-     */
-    public double irrigationSeconds(Map<String, BigDecimal> form) throws AiServiceException {
-        List<Path> photos = requirePhotos(properties.photoMaxAge());
-        Map<?, ?> result = result(postForm(RUN_IRRIGATION, "Irrigation", form, photos), RUN_IRRIGATION);
-        double seconds = number(result, "durasi_irigasi", RUN_IRRIGATION);
-        log.info("AI fuzzy irrigation: {} s ({} photo(s) sent)", seconds, photos.size());
-        return seconds;
     }
 
     /**

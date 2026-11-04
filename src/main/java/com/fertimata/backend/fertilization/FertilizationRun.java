@@ -112,6 +112,21 @@ public class FertilizationRun extends AuditedEntity {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
+    /** Asal takaran; null bila jalan ini tidak sampai menentukan takaran. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "dose_source", length = 16)
+    private FertilizationDoseSetting.Mode doseSource;
+
+    /** Takaran isian petani saat {@link #doseSource} MANUAL. */
+    @Column(name = "manual_nitrogen_ml", precision = 8, scale = 2)
+    private BigDecimal manualNitrogenMl;
+
+    @Column(name = "manual_phosphorus_ml", precision = 8, scale = 2)
+    private BigDecimal manualPhosphorusMl;
+
+    @Column(name = "manual_potassium_ml", precision = 8, scale = 2)
+    private BigDecimal manualPotassiumMl;
+
     public void setMessage(String message) {
         this.message = message == null || message.length() <= 500 ? message : message.substring(0, 500);
     }

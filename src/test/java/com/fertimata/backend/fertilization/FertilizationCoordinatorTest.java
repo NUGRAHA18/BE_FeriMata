@@ -69,6 +69,9 @@ class FertilizationCoordinatorTest {
     @Mock
     private AlertService alertService;
 
+    @Mock
+    private FertilizationDoseService doses;
+
     private FertilizationCoordinator coordinator;
     private final Map<String, Actuator> actuators = new HashMap<>();
     /** Status ACK per commandUid; bawaan EXECUTED. */
@@ -82,7 +85,7 @@ class FertilizationCoordinatorTest {
                 true, Duration.ofSeconds(5), 120, Duration.ofSeconds(5), Duration.ofSeconds(15),
                 Duration.ofSeconds(90), Duration.ofMinutes(15), null);
         coordinator = new FertilizationCoordinator(repository, service, properties, aiClient, aiInputs,
-                actuatorRepository, commandService, alertService);
+                actuatorRepository, commandService, alertService, doses);
         long id = 1;
         for (String code : List.of("DOSING-N", "DOSING-P", "DOSING-K", "STIRRER")) {
             Actuator actuator = TestFixtures.actuator(id++, TestFixtures.device(1L, "RIO-DOSING-01"), code);
@@ -93,6 +96,7 @@ class FertilizationCoordinatorTest {
         lenient().when(actuatorRepository.findFirstByCode(anyString()))
                 .thenAnswer(inv -> Optional.ofNullable(actuators.get(inv.<String>getArgument(0))));
         lenient().when(aiClient.configured()).thenReturn(true);
+        lenient().when(doses.mode()).thenReturn(FertilizationDoseSetting.Mode.AI);
         lenient().when(repository.save(any())).thenAnswer(inv -> {
             FertilizationRun run = inv.getArgument(0);
             if (run.getId() == null) {
@@ -313,5 +317,75 @@ class FertilizationCoordinatorTest {
         assertThat(run.getReasonCode()).isEqualTo("BACKEND_DOWN");
         verify(alertService).raise(any());
         verify(commandService, never()).issueSystemCommand(eq(2L), any());
+    }
+
+    /** Due today, manual dose; EC/pH fresh or stale, soil NPK always stale (not needed for a manual dose). */
+    private void dueManual(boolean tankFresh) throws AiServiceException {
+        when(doses.mode()).thenReturn(FertilizationDoseSetting.Mode.MANUAL);
+        when(aiClient.fertilizationIntervals()).thenReturn(List.of(new AiServiceClient.FertilizationInterval(3, 7)));
+        when(service.due(TODAY, 7)).thenReturn(true);
+        Map<String, BigDecimal> form = new HashMap<>();
+        form.put("ec", new BigDecimal("1.8"));
+        form.put("ph", tankFresh ? new BigDecimal("6.2") : null);
+        form.put("nitrogen_tanah", null);
+        List<String> problems = new ArrayList<>(List.of("fertilization.nitrogen_tanah (soil_a.nitrogen): no reading"));
+        if (!tankFresh) {
+            problems.add("fertilization.ph (tank.ph): stale, 1820 s old");
+        }
+        when(aiInputs.inputs()).thenReturn(new AiInputsResponse(NOW, 900, 20, null, null, false, false, form, Map.of(),
+                Map.of(), problems));
+    }
+
+    @Test
+    @DisplayName("manual dose: ml from the farmer, AI not called, stale soil NPK does not matter, over-limit capped")
+    void manualDose() throws Exception {
+        dueManual(true);
+        when(doses.manualDose(any(), any(), any())).thenReturn(new FertilizationDoseService.ManualDose(
+                new BigDecimal("50"), BigDecimal.ZERO, new BigDecimal("400"), 25, 0, 200));
+
+        assertThat(coordinator.beforeIrrigation(1L, TODAY, NOW)).isEqualTo(FertilizationCoordinator.Decision.DEFERRED);
+
+        FertilizationRun run = active.get();
+        assertThat(run.getDoseSource()).isEqualTo(FertilizationDoseSetting.Mode.MANUAL);
+        assertThat(run.getManualNitrogenMl()).isEqualByComparingTo("50");
+        assertThat(run.getManualPotassiumMl()).isEqualByComparingTo("400");
+        assertThat(run.getAiNitrogenSeconds()).isNull();
+        assertThat(run.getNitrogenSeconds()).isEqualTo(25);
+        assertThat(run.getPhosphorusSeconds()).isZero();
+        assertThat(run.getPotassiumSeconds()).isEqualTo(150);
+        assertThat(run.getReasonCode()).isEqualTo(FertilizationCoordinator.DOSE_CAPPED);
+        assertThat(sent).contains("DOSING-N ON 25");
+        verify(aiClient, never()).fertilizationDose(any());
+    }
+
+    @Test
+    @DisplayName("manual dose still obeys S9: stale drum pH means SKIPPED with TANK_DATA_NOT_READY")
+    void manualDoseStaleTank() throws Exception {
+        dueManual(false);
+
+        assertThat(coordinator.beforeIrrigation(1L, TODAY, NOW)).isEqualTo(FertilizationCoordinator.Decision.PROCEED);
+
+        ArgumentCaptor<FertilizationRun> run = ArgumentCaptor.forClass(FertilizationRun.class);
+        verify(repository).save(run.capture());
+        assertThat(run.getValue().getStatus()).isEqualTo(FertilizationRun.Status.SKIPPED);
+        assertThat(run.getValue().getReasonCode()).isEqualTo(FertilizationCoordinator.TANK_DATA_NOT_READY);
+        assertThat(run.getValue().getMessage()).contains("tank.ph").doesNotContain("nitrogen_tanah");
+        verify(doses, never()).manualDose(any(), any(), any());
+        verify(commandService, never()).issueSystemCommand(any(), any());
+    }
+
+    @Test
+    @DisplayName("manual dose with a pump that lost its calibration: SKIPPED, nothing poured, watering goes ahead")
+    void manualDoseNotCalibrated() throws Exception {
+        dueManual(true);
+        when(doses.manualDose(any(), any(), any())).thenThrow(new FertilizationDoseService.DoseUnavailableException(
+                FertilizationDoseService.PUMP_NOT_CALIBRATED, "Pump DOSING-P has no flow calibration"));
+
+        assertThat(coordinator.beforeIrrigation(1L, TODAY, NOW)).isEqualTo(FertilizationCoordinator.Decision.PROCEED);
+
+        ArgumentCaptor<FertilizationRun> run = ArgumentCaptor.forClass(FertilizationRun.class);
+        verify(repository).save(run.capture());
+        assertThat(run.getValue().getReasonCode()).isEqualTo("PUMP_NOT_CALIBRATED");
+        verify(commandService, never()).issueSystemCommand(any(), any());
     }
 }
