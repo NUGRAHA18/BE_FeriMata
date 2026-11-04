@@ -155,11 +155,9 @@ public class IrrigationScheduleService {
             String reasonCode,
             String message,
             String commandUid,
-            Integer durationSeconds,
-            IrrigationDurationResolver.Source durationSource) {
+            Integer durationSeconds) {
         repository.findById(id).ifPresent(s -> s.recordRun(
-                today, at, result, reasonCode, message, commandUid, durationSeconds,
-                durationSource == null ? null : durationSource.name()));
+                today, at, result, reasonCode, message, commandUid, durationSeconds));
     }
 
     /** Pompa siram yang aktif, bila ada. */
@@ -217,8 +215,7 @@ public class IrrigationScheduleService {
                 s.getLastReasonCode(),
                 s.getLastMessage(),
                 s.getLastCommandUid(),
-                s.getLastDurationSeconds(),
-                s.getLastDurationSource());
+                s.getLastDurationSeconds());
     }
 
     private Instant nextRun(IrrigationSchedule s) {

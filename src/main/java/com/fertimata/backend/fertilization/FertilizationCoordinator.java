@@ -35,7 +35,8 @@ import org.springframework.stereotype.Component;
  *
  * <ul>
  *   <li>jarak hari dari jadwal dosing AI; dosing pada sesi siram pertama yang jatuh tempo;
- *   <li>durasi N/P/K dari {@code run_fertilization}; tidak dosing dengan data EC/pH hilang atau basi (S9);
+ *   <li>takaran N/P/K dari {@code run_fertilization}, atau ml isian petani bila takaran diatur sendiri
+ *       ({@link FertilizationDoseService}, keputusan 4 Nov 2026); tidak dosing dengan data EC/pH hilang atau basi (S9);
  *   <li>pompa aduk menyala dulu, pompa N, P, K bergantian, aduk {@code mix-seconds}, lalu sesi siram itu jalan.
  * </ul>
  *
@@ -55,6 +56,12 @@ public class FertilizationCoordinator {
     static final String AI_NO_DOSE_NEEDED = "AI_NO_DOSE_NEEDED";
     static final String AI_CAPPED = "AI_CAPPED";
     static final String BACKEND_DOWN = "BACKEND_DOWN";
+    /** Mode takaran manual: EC/pH drum hilang atau basi (S9). */
+    static final String TANK_DATA_NOT_READY = "TANK_DATA_NOT_READY";
+    /** Takaran manual melebihi batas pompa (mis. kalibrasi berubah setelah disimpan). */
+    static final String DOSE_CAPPED = "DOSE_CAPPED";
+    /** Field form run_fertilization yang menjadi syarat S9 di mode manual. */
+    private static final List<String> TANK_FIELDS = List.of("ec", "ph");
 
     /** Jawaban untuk sesi siram yang jatuh tempo. */
     public enum Decision {
@@ -79,6 +86,7 @@ public class FertilizationCoordinator {
     private final ActuatorRepository actuatorRepository;
     private final ActuatorCommandService commandService;
     private final AlertService alertService;
+    private final FertilizationDoseService doses;
 
     public FertilizationCoordinator(
             FertilizationRunRepository repository,
@@ -88,7 +96,8 @@ public class FertilizationCoordinator {
             AiInputsService aiInputs,
             ActuatorRepository actuatorRepository,
             ActuatorCommandService commandService,
-            AlertService alertService) {
+            AlertService alertService,
+            FertilizationDoseService doses) {
         this.repository = repository;
         this.service = service;
         this.properties = properties;
@@ -97,6 +106,7 @@ public class FertilizationCoordinator {
         this.actuatorRepository = actuatorRepository;
         this.commandService = commandService;
         this.alertService = alertService;
+        this.doses = doses;
     }
 
     /** Dipanggil runner siram tepat sebelum menyalakan pompa siram untuk satu sesi yang jatuh tempo. */
@@ -123,8 +133,16 @@ public class FertilizationCoordinator {
         if (!service.due(today, interval)) {
             return Decision.PROCEED;
         }
+        boolean manual = doses.mode() == FertilizationDoseSetting.Mode.MANUAL;
         AiInputsResponse inputs = aiInputs.inputs();
-        if (!inputs.readyForFertilization()) {
+        if (manual) {
+            List<String> missing = TANK_FIELDS.stream().filter(f -> inputs.fertilization().get(f) == null).toList();
+            if (!missing.isEmpty()) {
+                notPoured(scheduleId, today, now, FertilizationRun.Status.SKIPPED, TANK_DATA_NOT_READY,
+                        tankProblems(inputs, missing), interval);
+                return Decision.PROCEED;
+            }
+        } else if (!inputs.readyForFertilization()) {
             notPoured(scheduleId, today, now, FertilizationRun.Status.SKIPPED, AI_INPUTS_NOT_READY,
                     String.join("; ", inputs.problems()), interval);
             return Decision.PROCEED;
@@ -137,6 +155,17 @@ public class FertilizationCoordinator {
                             properties.actuators().potassium(), properties.actuators().stirrer()), interval);
             return Decision.PROCEED;
         }
+        if (manual) {
+            FertilizationDoseService.ManualDose dose;
+            try {
+                dose = doses.manualDose(pumps.get().nitrogen(), pumps.get().phosphorus(), pumps.get().potassium());
+            } catch (FertilizationDoseService.DoseUnavailableException ex) {
+                notPoured(scheduleId, today, now, FertilizationRun.Status.SKIPPED, ex.reasonCode(), ex.getMessage(),
+                        interval);
+                return Decision.PROCEED;
+            }
+            return start(scheduleId, today, now, interval, null, dose, pumps.get());
+        }
         AiServiceClient.Dose dose;
         try {
             dose = aiClient.fertilizationDose(inputs.fertilization());
@@ -147,7 +176,15 @@ public class FertilizationCoordinator {
             notPoured(scheduleId, today, now, FertilizationRun.Status.FAILED, AI_UNAVAILABLE, ex.getMessage(), interval);
             return Decision.PROCEED;
         }
-        return start(scheduleId, today, now, interval, dose, pumps.get());
+        return start(scheduleId, today, now, interval, dose, null, pumps.get());
+    }
+
+    /** Hanya masalah EC/pH; field AI lain (NPK tanah, HST) tidak dibutuhkan takaran manual. */
+    private static String tankProblems(AiInputsResponse inputs, List<String> missing) {
+        List<String> problems = inputs.problems().stream()
+                .filter(problem -> missing.stream().anyMatch(f -> problem.startsWith("fertilization." + f + " ")))
+                .toList();
+        return problems.isEmpty() ? "Missing " + String.join(", ", missing) : String.join("; ", problems);
     }
 
     /**
@@ -337,22 +374,41 @@ public class FertilizationCoordinator {
                 .isPresent();
     }
 
+    /** Tepat satu dari {@code ai} dan {@code manual} terisi. */
     private Decision start(
-            Long scheduleId, LocalDate today, Instant now, int interval, AiServiceClient.Dose dose, Pumps pumps) {
+            Long scheduleId, LocalDate today, Instant now, int interval, AiServiceClient.Dose ai,
+            FertilizationDoseService.ManualDose manual, Pumps pumps) {
         FertilizationRun run = new FertilizationRun();
         run.setRunDate(today);
         run.setIrrigationScheduleId(scheduleId);
         run.setIntervalDays(interval);
         run.setStartedAt(now);
-        run.setAiNitrogenSeconds(decimal(dose.nitrogenSeconds()));
-        run.setAiPhosphorusSeconds(decimal(dose.phosphorusSeconds()));
-        run.setAiPotassiumSeconds(decimal(dose.potassiumSeconds()));
+        double n;
+        double p;
+        double k;
+        if (manual != null) {
+            run.setDoseSource(FertilizationDoseSetting.Mode.MANUAL);
+            run.setManualNitrogenMl(manual.nitrogenMl());
+            run.setManualPhosphorusMl(manual.phosphorusMl());
+            run.setManualPotassiumMl(manual.potassiumMl());
+            n = manual.nitrogenSeconds();
+            p = manual.phosphorusSeconds();
+            k = manual.potassiumSeconds();
+        } else {
+            run.setDoseSource(FertilizationDoseSetting.Mode.AI);
+            run.setAiNitrogenSeconds(decimal(ai.nitrogenSeconds()));
+            run.setAiPhosphorusSeconds(decimal(ai.phosphorusSeconds()));
+            run.setAiPotassiumSeconds(decimal(ai.potassiumSeconds()));
+            n = ai.nitrogenSeconds();
+            p = ai.phosphorusSeconds();
+            k = ai.potassiumSeconds();
+        }
         List<String> capped = new ArrayList<>();
-        run.setNitrogenSeconds(seconds("N", dose.nitrogenSeconds(), pumps.nitrogen(), capped));
-        run.setPhosphorusSeconds(seconds("P", dose.phosphorusSeconds(), pumps.phosphorus(), capped));
-        run.setPotassiumSeconds(seconds("K", dose.potassiumSeconds(), pumps.potassium(), capped));
+        run.setNitrogenSeconds(seconds("N", n, pumps.nitrogen(), capped));
+        run.setPhosphorusSeconds(seconds("P", p, pumps.phosphorus(), capped));
+        run.setPotassiumSeconds(seconds("K", k, pumps.potassium(), capped));
         if (!capped.isEmpty()) {
-            run.setReasonCode(AI_CAPPED);
+            run.setReasonCode(manual != null ? DOSE_CAPPED : AI_CAPPED);
             run.setMessage("Capped to the pump limit: " + String.join(", ", capped));
         }
         int total = run.getNitrogenSeconds() + run.getPhosphorusSeconds() + run.getPotassiumSeconds();
@@ -384,8 +440,8 @@ public class FertilizationCoordinator {
         run.setNextActionAt(now);
         run = dose(run, now, pumps.nitrogen(), run.getNitrogenSeconds(), FertilizationRun.Step.PHOSPHORUS,
                 pumps.stirrer());
-        log.info("Fertilization {} started before watering schedule {}: N {} s, P {} s, K {} s, stirrer {} s",
-                run.getId(), scheduleId, run.getNitrogenSeconds(), run.getPhosphorusSeconds(),
+        log.info("Fertilization {} started before watering schedule {} ({} dose): N {} s, P {} s, K {} s, stirrer {} s",
+                run.getId(), scheduleId, run.getDoseSource(), run.getNitrogenSeconds(), run.getPhosphorusSeconds(),
                 run.getPotassiumSeconds(), run.getStirrerSeconds());
         return Decision.DEFERRED;
     }
@@ -540,8 +596,8 @@ public class FertilizationCoordinator {
         return (int) (max != null && wanted > max ? max : wanted);
     }
 
-    private static int seconds(String label, double aiSeconds, Actuator pump, List<String> capped) {
-        int s = (int) Math.max(0, Math.round(aiSeconds));
+    private static int seconds(String label, double wanted, Actuator pump, List<String> capped) {
+        int s = (int) Math.max(0, Math.round(wanted));
         Integer max = pump.getMaxRunSeconds();
         if (max != null && s > max) {
             capped.add("%s %d s -> %d s".formatted(label, s, max));

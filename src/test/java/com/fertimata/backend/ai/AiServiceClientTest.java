@@ -43,7 +43,7 @@ class AiServiceClientTest {
     private final AtomicReference<String> uri = new AtomicReference<>();
 
     private String serve(int status, String json) throws IOException {
-        return serve(AiServiceClient.RUN_IRRIGATION, status, json);
+        return serve(AiServiceClient.RUN_FERTILIZATION, status, json);
     }
 
     private String serve(String path, int status, String json) throws IOException {
@@ -106,18 +106,18 @@ class AiServiceClientTest {
     }
 
     @Test
-    @DisplayName("posts the form fields and the newest patrol photos, and reads result.durasi_irigasi")
+    @DisplayName("posts the form fields and the newest patrol photos as multipart with a Content-Length")
     void postsFormAndPhotos() throws Exception {
         photo("2026-10-30/old.jpg", NOW.minus(Duration.ofDays(3)));
         photo("2026-10-30/a.jpg", NOW.minus(Duration.ofHours(3)));
         photo("2026-10-31/b.png", NOW.minus(Duration.ofHours(1)));
         photo("2026-10-31/c.JPG", NOW.minus(Duration.ofHours(2)));
         photo("2026-10-31/notes.txt", NOW);
-        String url = serve(200, "{\"status\":\"success\",\"result\":{\"durasi_irigasi\":47.25}}");
+        String url = serve(200, "{\"status\":\"success\",\"result\":{\"durasi_pompa_n\":1,\"durasi_pompa_p\":2,\"durasi_pompa_k\":3}}");
 
-        double seconds = client(url).irrigationSeconds(form());
+        AiServiceClient.Dose dose = client(url).fertilizationDose(form());
 
-        assertThat(seconds).isEqualTo(47.25);
+        assertThat(dose).isEqualTo(new AiServiceClient.Dose(1, 2, 3));
         assertThat(contentType.get()).startsWith("multipart/form-data");
         // Flask/Werkzeug membaca body chunked sebagai kosong: wajib Content-Length.
         assertThat(transferEncoding.get()).isNull();
@@ -134,7 +134,7 @@ class AiServiceClientTest {
         freshPhoto();
         String url = serve(400, "{\"status\":\"error\",\"message\":\"Input yang dimasukkan harus berupa string angka\"}");
 
-        assertThatThrownBy(() -> client(url).irrigationSeconds(form()))
+        assertThatThrownBy(() -> client(url).fertilizationDose(form()))
                 .isInstanceOf(AiServiceException.class)
                 .hasMessageContaining("400")
                 .hasMessageContaining("string angka");
@@ -144,7 +144,7 @@ class AiServiceClientTest {
     @DisplayName("an unreachable AI service becomes an AiServiceException")
     void unreachable() throws Exception {
         freshPhoto();
-        assertThatThrownBy(() -> client("http://127.0.0.1:1").irrigationSeconds(form()))
+        assertThatThrownBy(() -> client("http://127.0.0.1:1").fertilizationDose(form()))
                 .isInstanceOf(AiServiceException.class);
     }
 
@@ -155,7 +155,7 @@ class AiServiceClientTest {
         Map<String, BigDecimal> form = form();
         form.put("ph", null);
 
-        assertThatThrownBy(() -> client("http://127.0.0.1:1").irrigationSeconds(form))
+        assertThatThrownBy(() -> client("http://127.0.0.1:1").fertilizationDose(form))
                 .isInstanceOf(AiServiceException.class)
                 .hasMessageContaining("ph");
     }
@@ -164,21 +164,19 @@ class AiServiceClientTest {
     @DisplayName("no patrol photo: NoPhotoException and the AI is not called (it refuses requests without a photo)")
     void noPhoto() throws Exception {
         photo("2026-10-28/old.jpg", NOW.minus(Duration.ofDays(4)));
-        String url = serve(200, "{\"status\":\"success\",\"result\":{\"durasi_irigasi\":47.25}}");
+        String url = serve(200, "{\"status\":\"success\",\"result\":{\"durasi_pompa_n\":1,\"durasi_pompa_p\":2,\"durasi_pompa_k\":3}}");
 
-        assertThatThrownBy(() -> client(url).irrigationSeconds(form())).isInstanceOf(NoPhotoException.class);
         assertThatThrownBy(() -> client(url).fertilizationDose(form())).isInstanceOf(NoPhotoException.class);
         assertThat(requestBody.get()).isNull();
     }
 
     @Test
-    @DisplayName("fertilization accepts photos up to fertilization-photo-max-age (72 h); irrigation only 24 h")
+    @DisplayName("fertilization accepts photos up to fertilization-photo-max-age (72 h), older than photo-max-age (24 h)")
     void fertilizationPhotoAge() throws Exception {
         photo("2026-10-29/two-days.jpg", NOW.minus(Duration.ofHours(48)));
         String url = serve(AiServiceClient.RUN_FERTILIZATION, 200,
                 "{\"status\":\"success\",\"result\":{\"durasi_pompa_n\":1,\"durasi_pompa_p\":2,\"durasi_pompa_k\":3}}");
 
-        assertThatThrownBy(() -> client(url).irrigationSeconds(form())).isInstanceOf(NoPhotoException.class);
         assertThat(client(url).fertilizationDose(form())).isEqualTo(new AiServiceClient.Dose(1, 2, 3));
         assertThat(requestBody.get()).contains("filename=\"two-days.jpg\"");
     }

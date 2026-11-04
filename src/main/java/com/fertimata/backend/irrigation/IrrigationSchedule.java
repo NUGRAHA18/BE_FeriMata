@@ -66,13 +66,9 @@ public class IrrigationSchedule extends AuditedEntity {
     @Column(name = "last_reason_code", length = 64)
     private String lastReasonCode;
 
-    /** Durasi yang benar-benar dikirim ke pompa pada jalan terakhir (dari AI atau cadangan). */
+    /** Durasi yang benar-benar dikirim ke pompa pada jalan terakhir. */
     @Column(name = "last_duration_seconds")
     private Integer lastDurationSeconds;
-
-    /** AI, FALLBACK, MANUAL; null bila jalan terakhir tidak sampai menentukan durasi. */
-    @Column(name = "last_duration_source", length = 16)
-    private String lastDurationSource;
 
     public void recordRun(
             LocalDate date,
@@ -81,11 +77,9 @@ public class IrrigationSchedule extends AuditedEntity {
             String reasonCode,
             String message,
             String commandUid,
-            Integer durationSeconds,
-            String durationSource) {
+            Integer durationSeconds) {
         recordRun(date, at, result, reasonCode, message, commandUid);
         this.lastDurationSeconds = durationSeconds;
-        this.lastDurationSource = durationSource;
     }
 
     public void recordRun(
@@ -97,7 +91,6 @@ public class IrrigationSchedule extends AuditedEntity {
         this.lastMessage = message == null || message.length() <= 500 ? message : message.substring(0, 500);
         this.lastCommandUid = commandUid;
         this.lastDurationSeconds = null;
-        this.lastDurationSource = null;
     }
 
     @Override
