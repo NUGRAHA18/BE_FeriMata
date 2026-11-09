@@ -4,8 +4,9 @@
 #   docker compose up -d --build
 #
 # Only Caddy publishes a port. The browser reaches the frontend and the API on the same origin
-# (/api, /ws), so no CORS is involved. Cloudflare Tunnel (systemd on the host) points at
-# http://localhost:80, and LAN clients can open http://<jetson-ip> directly when the internet is down.
+# (/api, /ws), so no CORS is involved. Public HTTPS comes from the cloudflared service below (profile
+# "tunnel", the team's own Cloudflare account): Cloudflare terminates TLS and the tunnel forwards to
+# http://caddy:80. LAN clients can still open http://<jetson-ip> directly when the internet is down.
 #
 # Relative paths resolve from this directory: ".." is this backend repository, and the frontend
 # repository is expected next to it (override with FRONTEND_CONTEXT).
@@ -158,12 +159,31 @@ services:
       - backend
       - frontend
     ports:
-      # All interfaces: cloudflared on the host and LAN clients both come in here.
+      # All interfaces, for LAN and Tailscale clients. The cloudflared service reaches caddy:80 on the
+      # compose network and does not need this port.
       - "${HTTP_PORT:-80}:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
+
+  # Public HTTPS for the dashboard through a remotely managed Cloudflare Tunnel (no inbound port, works
+  # behind the campus NAT). In the Zero Trust dashboard the tunnel's public hostname points at
+  # http://caddy:80. Started only with COMPOSE_PROFILES=tunnel and a token in .env. This is separate from
+  # any cloudflared already installed on the host for SSH.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      - caddy
+    command: tunnel --no-autoupdate run
+    environment:
+      # Not ":?" here: compose interpolates every service, so that would break LAN-only deployments.
+      # An empty token makes cloudflared exit with an error in its own logs.
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    mem_limit: 128m
 
 volumes:
   postgres-data:
