@@ -527,6 +527,8 @@ class FertiMataIntegrationTest {
                 .andExpect(jsonPath(runPath + ".time").value(time))
                 .andExpect(jsonPath(runPath + ".durationSeconds").value(240))
                 .andExpect(jsonPath(runPath + ".commandStatus").exists());
+        mockMvc.perform(get("/api/irrigation/schedules").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(jsonPath("$[?(@.id == " + scheduleId + ")].lastCommandStatus").exists());
         Integer runs = jdbcTemplate.queryForObject(
                 "select count(*) from irrigation_run where irrigation_schedule_id = ?", Integer.class, scheduleId);
         assertThat(runs).isEqualTo(1);

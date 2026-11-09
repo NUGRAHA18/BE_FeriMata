@@ -1,6 +1,7 @@
 package com.fertimata.backend.irrigation;
 
 import com.fertimata.backend.actuator.domain.Actuator;
+import com.fertimata.backend.actuator.domain.ActuatorCommand;
 import com.fertimata.backend.actuator.domain.ActuatorCommandRepository;
 import com.fertimata.backend.actuator.domain.ActuatorRepository;
 import com.fertimata.backend.common.exception.BusinessRuleException;
@@ -251,6 +252,9 @@ public class IrrigationScheduleService {
     }
 
     private IrrigationScheduleResponse toResponse(IrrigationSchedule s) {
+        ActuatorCommand command = s.getLastCommandUid() == null
+                ? null
+                : commandRepository.findByCommandUid(s.getLastCommandUid()).orElse(null);
         return new IrrigationScheduleResponse(
                 s.getId(),
                 HH_MM.format(s.getTimeOfDay()),
@@ -263,7 +267,9 @@ public class IrrigationScheduleService {
                 s.getLastReasonCode(),
                 s.getLastMessage(),
                 s.getLastCommandUid(),
-                s.getLastDurationSeconds());
+                s.getLastDurationSeconds(),
+                command == null ? null : command.getStatus(),
+                command == null ? null : command.getFailureCode());
     }
 
     private Instant nextRun(IrrigationSchedule s) {

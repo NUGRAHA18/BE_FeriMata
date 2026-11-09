@@ -4768,6 +4768,21 @@
             "type": "integer",
             "format": "int32",
             "description": "Seconds actually sent to the pump on the last run; null when it did not get that far"
+          },
+          "lastCommandStatus": {
+            "type": "string",
+            "description": "Device status of lastCommandUid (EXECUTED, FAILED, ...); null without a command. STARTED with FAILED means the command was sent but the device did not water.",
+            "enum": [
+              "PENDING",
+              "SENT",
+              "EXECUTED",
+              "FAILED",
+              "CANCELLED"
+            ]
+          },
+          "lastCommandFailureCode": {
+            "type": "string",
+            "description": "Device failure code when that command failed (NO_RESPONSE, INTERLOCK_*, ...)"
           }
         }
       },

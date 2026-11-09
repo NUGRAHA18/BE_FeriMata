@@ -1,5 +1,6 @@
 package com.fertimata.backend.irrigation.dto;
 
+import com.fertimata.backend.actuator.domain.CommandStatus;
 import com.fertimata.backend.irrigation.IrrigationSchedule;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
@@ -25,4 +26,10 @@ public record IrrigationScheduleResponse(
         @Schema(description = "Technical detail; English for safety refusals") String lastMessage,
         @Schema(description = "Command of the last run; GET /api/actuators/commands/{commandUid}") String lastCommandUid,
         @Schema(description = "Seconds actually sent to the pump on the last run; null when it did not get that far")
-                Integer lastDurationSeconds) {}
+                Integer lastDurationSeconds,
+        @Schema(
+                        description = "Device status of lastCommandUid (EXECUTED, FAILED, ...); null without a command. "
+                                + "STARTED with FAILED means the command was sent but the device did not water.")
+                CommandStatus lastCommandStatus,
+        @Schema(description = "Device failure code when that command failed (NO_RESPONSE, INTERLOCK_*, ...)")
+                String lastCommandFailureCode) {}
