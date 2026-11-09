@@ -519,9 +519,28 @@ class FertiMataIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.commandType").value("ON"));
 
+        // Riwayat (V21): satu baris untuk sesi ini, dengan status perintah pompanya.
+        String runPath = "$.content[?(@.commandUid == '" + schedule.get("last_command_uid") + "')]";
+        mockMvc.perform(get("/api/irrigation/runs").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath(runPath + ".result").value("STARTED"))
+                .andExpect(jsonPath(runPath + ".time").value(time))
+                .andExpect(jsonPath(runPath + ".durationSeconds").value(240))
+                .andExpect(jsonPath(runPath + ".commandStatus").exists());
+        Integer runs = jdbcTemplate.queryForObject(
+                "select count(*) from irrigation_run where irrigation_schedule_id = ?", Integer.class, scheduleId);
+        assertThat(runs).isEqualTo(1);
+        mockMvc.perform(get("/api/irrigation/runs?size=500").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.details.size").exists());
+
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/irrigation/schedules/" + scheduleId)
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isNoContent());
+        // Riwayat tetap ada setelah jadwalnya dihapus.
+        mockMvc.perform(get("/api/irrigation/runs").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(jsonPath(runPath + ".irrigationScheduleId").value(org.hamcrest.Matchers.contains((Object) null)));
     }
 
     private void ingestHumidity(Instant recordedAt, String value) {

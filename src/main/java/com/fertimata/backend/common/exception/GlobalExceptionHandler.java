@@ -2,6 +2,7 @@ package com.fertimata.backend.common.exception;
 
 import com.fertimata.backend.common.response.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -62,6 +63,18 @@ public class GlobalExceptionHandler {
             String name = result.getMethodParameter().getParameterName();
             details.putIfAbsent(name == null ? "request" : name, error.getDefaultMessage());
         }));
+        return build(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR.name(), "Invalid request", request, details);
+    }
+
+    /** Same as above for controllers annotated {@code @Validated}, whose AOP proxy throws this instead. */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiError> handleConstraintViolation(
+            ConstraintViolationException ex, HttpServletRequest request) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        ex.getConstraintViolations().forEach(violation -> {
+            String path = violation.getPropertyPath().toString();
+            details.putIfAbsent(path.substring(path.lastIndexOf('.') + 1), violation.getMessage());
+        });
         return build(HttpStatus.BAD_REQUEST, ErrorCode.VALIDATION_ERROR.name(), "Invalid request", request, details);
     }
 

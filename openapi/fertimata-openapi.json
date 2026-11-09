@@ -72,10 +72,6 @@
       "description": "Peristaltic pump flow and dispensed volume (Protokol-Data.md §6, §8)"
     },
     {
-      "name": "Fertilization",
-      "description": "Automatic fertilization: the interval and the N/P/K doses come from the AI service; the backend runs it before the first watering session of a due day"
-    },
-    {
       "name": "AI detections",
       "description": "Results produced by the vision model on the edge device"
     },
@@ -90,6 +86,10 @@
     {
       "name": "Plants",
       "description": "Plants shown on the dashboard"
+    },
+    {
+      "name": "Fertilization",
+      "description": "Automatic fertilization: the interval comes from the AI service; the N/P/K dose from the AI by default, or the farmer's millilitres. The backend runs it before the first watering session of a due day"
     },
     {
       "name": "Development tools",
@@ -251,6 +251,68 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/FertilizationSchedule"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/fertilization/dose": {
+      "get": {
+        "tags": [
+          "Fertilization"
+        ],
+        "summary": "How the N/P/K dose is decided",
+        "description": "AI (default) or MANUAL millilitres, plus each dosing pump's calibration and most ml per run.",
+        "operationId": "dose",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FertilizationDose"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Fertilization"
+        ],
+        "summary": "Use the AI dose or the farmer's millilitres",
+        "description": "MANUAL needs N, P and K ml (0 allowed, not all 0). Every pump with ml > 0 must be enabled and flow-calibrated, and the ml must fit in one run (maxMl). 409 details.reason: DOSE_MISSING, DOSE_ZERO, PUMP_UNAVAILABLE, PUMP_NOT_CALIBRATED, TOO_MUCH (with nutrient, actuatorCode, maxMl). Stale EC/pH in the drum still blocks dosing in both modes.",
+        "operationId": "setDose",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FertilizationDoseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/FertilizationDose"
                 }
               }
             }
@@ -2648,6 +2710,58 @@
         ]
       }
     },
+    "/api/irrigation/runs": {
+      "get": {
+        "tags": [
+          "Irrigation schedule"
+        ],
+        "summary": "Scheduled watering history, newest first",
+        "description": "One row per watering time per day, including skipped, failed and missed sessions; with the device status of the pump command.",
+        "operationId": "runs",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0,
+              "minimum": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "maximum": 200,
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/fertilization/runs": {
       "get": {
         "tags": [
@@ -2655,7 +2769,7 @@
         ],
         "summary": "Fertilization runs, newest first",
         "description": "Including skipped and failed attempts.",
-        "operationId": "runs",
+        "operationId": "runs_1",
         "parameters": [
           {
             "name": "page",
@@ -3492,7 +3606,7 @@
           },
           "status": {
             "type": "string",
-            "description": "IN_PROGRESS; DONE (AI dose poured, also when the AI said 0 s); PARTIAL (some pumps ran, counted as fertilized so it is not doubled); SKIPPED (not poured: stale sensor data, pump missing); FAILED (not poured: AI unusable, command refused, backend down)",
+            "description": "IN_PROGRESS; DONE (dose poured, also when the AI said 0 s); PARTIAL (some pumps ran, counted as fertilized so it is not doubled); SKIPPED (not poured: stale sensor data, pump missing); FAILED (not poured: AI unusable, command refused, backend down)",
             "enum": [
               "IN_PROGRESS",
               "DONE",
@@ -3513,7 +3627,7 @@
           },
           "reasonCode": {
             "type": "string",
-            "description": "AI_UNAVAILABLE, AI_INPUTS_NOT_READY, AI_NO_PHOTO, PUMP_UNAVAILABLE, AI_NO_DOSE_NEEDED, AI_CAPPED, BACKEND_DOWN, or an interlock code (BACKUP_POWER, FLOAT_LOW, ...). Translate this, not message.",
+            "description": "AI_UNAVAILABLE, AI_INPUTS_NOT_READY, AI_NO_PHOTO, PUMP_UNAVAILABLE, AI_NO_DOSE_NEEDED, AI_CAPPED, TANK_DATA_NOT_READY, PUMP_NOT_CALIBRATED, DOSE_CAPPED (manual dose), BACKEND_DOWN, or an interlock code (BACKUP_POWER, FLOAT_LOW, ...). Translate this, not message.",
             "example": "AI_INPUTS_NOT_READY"
           },
           "message": {
@@ -3535,10 +3649,28 @@
           "aiPotassiumSeconds": {
             "type": "number"
           },
+          "doseSource": {
+            "type": "string",
+            "description": "AI (fuzzy fertilization) or MANUAL (farmer's ml); null when the dose was never decided",
+            "enum": [
+              "AI",
+              "MANUAL"
+            ]
+          },
+          "manualNitrogenMl": {
+            "type": "number",
+            "description": "Farmer's millilitres when doseSource is MANUAL"
+          },
+          "manualPhosphorusMl": {
+            "type": "number"
+          },
+          "manualPotassiumMl": {
+            "type": "number"
+          },
           "nitrogenSeconds": {
             "type": "integer",
             "format": "int32",
-            "description": "Seconds sent to the pump (AI value capped to the pump's maxRunSeconds)"
+            "description": "Seconds sent to the pump (AI seconds, or ml / calibrated flow; capped to maxRunSeconds)"
           },
           "phosphorusSeconds": {
             "type": "integer",
@@ -3624,6 +3756,106 @@
           "activeRun": {
             "$ref": "#/components/schemas/FertilizationRun",
             "description": "The run in progress, if any"
+          }
+        }
+      },
+      "FertilizationDoseRequest": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "AI = dose from the AI fuzzy fertilization (default); MANUAL = the millilitres below",
+            "enum": [
+              "AI",
+              "MANUAL"
+            ],
+            "example": "MANUAL"
+          },
+          "nitrogenMl": {
+            "type": "number",
+            "description": "Millilitres of nutrient N per fertilization; required for MANUAL",
+            "example": 50,
+            "maximum": 10000,
+            "minimum": 0
+          },
+          "phosphorusMl": {
+            "type": "number",
+            "description": "Millilitres of nutrient P; required for MANUAL",
+            "example": 30,
+            "maximum": 10000,
+            "minimum": 0
+          },
+          "potassiumMl": {
+            "type": "number",
+            "description": "Millilitres of nutrient K; required for MANUAL",
+            "example": 40,
+            "maximum": 10000,
+            "minimum": 0
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "FertilizationDose": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "description": "AI (default) or MANUAL",
+            "enum": [
+              "AI",
+              "MANUAL"
+            ]
+          },
+          "nitrogenMl": {
+            "type": "number",
+            "description": "Farmer's millilitres; kept while mode is AI so they need not be typed again"
+          },
+          "phosphorusMl": {
+            "type": "number"
+          },
+          "potassiumMl": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "pumps": {
+            "type": "array",
+            "description": "Dosing pumps N, P, K: what a manual dose needs",
+            "items": {
+              "$ref": "#/components/schemas/FertilizationDosePump"
+            }
+          }
+        }
+      },
+      "FertilizationDosePump": {
+        "type": "object",
+        "properties": {
+          "nutrient": {
+            "type": "string",
+            "example": "N"
+          },
+          "actuatorCode": {
+            "type": "string",
+            "example": "DOSING-N"
+          },
+          "available": {
+            "type": "boolean",
+            "description": "False when the pump is missing or disabled"
+          },
+          "flowMlPerSecond": {
+            "type": "number",
+            "description": "Latest flow calibration; null = not calibrated, so a manual dose cannot be used"
+          },
+          "maxMl": {
+            "type": "number",
+            "description": "Most millilitres per run = maxRunSeconds x flow; null when unknown"
           }
         }
       },
@@ -4490,7 +4722,7 @@
           "durationSeconds": {
             "type": "integer",
             "format": "int32",
-            "description": "Fallback duration: used when the AI fuzzy irrigation cannot be used (or always when app.irrigation.duration-source=MANUAL). Normally the AI decides the duration at run time.",
+            "description": "How long the watering pump runs each time this schedule starts",
             "example": 300
           },
           "enabled": {
@@ -4536,11 +4768,6 @@
             "type": "integer",
             "format": "int32",
             "description": "Seconds actually sent to the pump on the last run; null when it did not get that far"
-          },
-          "lastDurationSource": {
-            "type": "string",
-            "description": "AI (from the AI fuzzy irrigation), FALLBACK (AI unusable; lastReasonCode says why: AI_NOT_CONFIGURED, AI_INPUTS_NOT_READY, AI_NO_PHOTO, AI_UNAVAILABLE) or MANUAL",
-            "example": "AI"
           }
         }
       },

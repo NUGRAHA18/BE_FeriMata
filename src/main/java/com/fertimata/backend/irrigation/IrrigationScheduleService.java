@@ -1,10 +1,13 @@
 package com.fertimata.backend.irrigation;
 
 import com.fertimata.backend.actuator.domain.Actuator;
+import com.fertimata.backend.actuator.domain.ActuatorCommandRepository;
 import com.fertimata.backend.actuator.domain.ActuatorRepository;
 import com.fertimata.backend.common.exception.BusinessRuleException;
 import com.fertimata.backend.common.exception.ResourceNotFoundException;
+import com.fertimata.backend.common.response.PageResponse;
 import com.fertimata.backend.cultivation.CultivationService;
+import com.fertimata.backend.irrigation.dto.IrrigationRunResponse;
 import com.fertimata.backend.irrigation.dto.IrrigationScheduleRequest;
 import com.fertimata.backend.irrigation.dto.IrrigationScheduleResponse;
 import com.fertimata.backend.irrigation.dto.IrrigationScheduleUpdateRequest;
@@ -20,6 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +38,8 @@ public class IrrigationScheduleService {
     public record Due(Long id, LocalTime time, int durationSeconds) {}
 
     private final IrrigationScheduleRepository repository;
+    private final IrrigationRunRepository runRepository;
+    private final ActuatorCommandRepository commandRepository;
     private final ActuatorRepository actuatorRepository;
     private final CultivationService cultivationService;
     private final IrrigationProperties properties;
@@ -41,11 +47,15 @@ public class IrrigationScheduleService {
 
     public IrrigationScheduleService(
             IrrigationScheduleRepository repository,
+            IrrigationRunRepository runRepository,
+            ActuatorCommandRepository commandRepository,
             ActuatorRepository actuatorRepository,
             CultivationService cultivationService,
             IrrigationProperties properties,
             Clock clock) {
         this.repository = repository;
+        this.runRepository = runRepository;
+        this.commandRepository = commandRepository;
         this.actuatorRepository = actuatorRepository;
         this.cultivationService = cultivationService;
         this.properties = properties;
@@ -142,10 +152,10 @@ public class IrrigationScheduleService {
             String reasonCode,
             String message,
             String commandUid) {
-        repository.findById(id).ifPresent(s -> s.recordRun(today, at, result, reasonCode, message, commandUid));
+        record(id, today, at, result, reasonCode, message, commandUid, null);
     }
 
-    /** Seperti {@link #record}, ditambah durasi yang dipakai dan sumbernya (AI / FALLBACK / MANUAL). */
+    /** Seperti {@link #record}, ditambah durasi yang dikirim ke pompa. Juga ditulis ke riwayat {@code irrigation_run}. */
     @Transactional
     public void record(
             Long id,
@@ -156,8 +166,46 @@ public class IrrigationScheduleService {
             String message,
             String commandUid,
             Integer durationSeconds) {
-        repository.findById(id).ifPresent(s -> s.recordRun(
-                today, at, result, reasonCode, message, commandUid, durationSeconds));
+        repository.findById(id).ifPresent(s -> {
+            s.recordRun(today, at, result, reasonCode, message, commandUid, durationSeconds);
+            appendHistory(s, today, at, result, reasonCode, message, commandUid, durationSeconds);
+        });
+    }
+
+    /** Riwayat siram terbaru; status perintah pompa diambil dari log perintah aktuator. */
+    @Transactional(readOnly = true)
+    public PageResponse<IrrigationRunResponse> runs(Pageable pageable) {
+        return PageResponse.from(runRepository.findAllByOrderByRunDateDescIdDesc(pageable), r -> IrrigationRunResponse.from(
+                r, r.getCommandUid() == null ? null : commandRepository.findByCommandUid(r.getCommandUid()).orElse(null)));
+    }
+
+    /** Satu baris per jadwal per tanggal: sesi WAITING diperbarui dengan hasil akhirnya setelah pemupukan. */
+    private void appendHistory(
+            IrrigationSchedule schedule,
+            LocalDate date,
+            Instant at,
+            IrrigationSchedule.RunResult result,
+            String reasonCode,
+            String message,
+            String commandUid,
+            Integer durationSeconds) {
+        IrrigationRun run = runRepository
+                .findFirstByIrrigationScheduleIdAndRunDateAndResultOrderByIdDesc(
+                        schedule.getId(), date, IrrigationSchedule.RunResult.WAITING)
+                .orElseGet(() -> {
+                    IrrigationRun created = new IrrigationRun();
+                    created.setRunDate(date);
+                    created.setIrrigationScheduleId(schedule.getId());
+                    created.setScheduledTime(schedule.getTimeOfDay());
+                    return created;
+                });
+        run.setResult(result);
+        run.setReasonCode(reasonCode);
+        run.setMessage(schedule.getLastMessage());
+        run.setCommandUid(commandUid);
+        run.setDurationSeconds(durationSeconds);
+        run.setRecordedAt(at);
+        runRepository.save(run);
     }
 
     /** Pompa siram yang aktif, bila ada. */
