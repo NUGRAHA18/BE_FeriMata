@@ -137,7 +137,9 @@ class FertilizationCoordinatorTest {
         Map<String, BigDecimal> form = new HashMap<>();
         form.put("ec", ready ? new BigDecimal("1.8") : null);
         return new AiInputsResponse(NOW, 900, 20, null, null, ready, true, form, Map.of(), Map.of(),
-                ready ? List.of() : List.of("fertilization.ec (tank.ec): stale, 1820 s old"));
+                ready ? List.of() : List.of(
+                        "fertilization.ec (tank.ec): stale, 1820 s old",
+                        "irrigation.rh (air.humidity): stale, 1820 s old"));
     }
 
     @Test
@@ -174,6 +176,8 @@ class FertilizationCoordinatorTest {
         verify(repository).save(run.capture());
         assertThat(run.getValue().getStatus()).isEqualTo(FertilizationRun.Status.SKIPPED);
         assertThat(run.getValue().getReasonCode()).isEqualTo("AI_INPUTS_NOT_READY");
+        // Hanya field form pupuk; field siram tidak relevan untuk pemupukan.
+        assertThat(run.getValue().getMessage()).isEqualTo("fertilization.ec (tank.ec): stale, 1820 s old");
         verify(aiClient, never()).fertilizationDose(any());
         ArgumentCaptor<NewAlert> alert = ArgumentCaptor.forClass(NewAlert.class);
         verify(alertService).raise(alert.capture());
