@@ -144,7 +144,7 @@ public class FertilizationCoordinator {
             }
         } else if (!inputs.readyForFertilization()) {
             notPoured(scheduleId, today, now, FertilizationRun.Status.SKIPPED, AI_INPUTS_NOT_READY,
-                    String.join("; ", inputs.problems()), interval);
+                    fertilizationProblems(inputs), interval);
             return Decision.PROCEED;
         }
         Optional<Pumps> pumps = pumps();
@@ -177,6 +177,14 @@ public class FertilizationCoordinator {
             return Decision.PROCEED;
         }
         return start(scheduleId, today, now, interval, dose, null, pumps.get());
+    }
+
+    /** Hanya masalah form {@code run_fertilization}; field {@code irrigation.*} tidak dipakai pemupukan. */
+    private static String fertilizationProblems(AiInputsResponse inputs) {
+        List<String> problems = inputs.problems().stream()
+                .filter(problem -> problem.startsWith("fertilization."))
+                .toList();
+        return String.join("; ", problems.isEmpty() ? inputs.problems() : problems);
     }
 
     /** Hanya masalah EC/pH; field AI lain (NPK tanah, HST) tidak dibutuhkan takaran manual. */
