@@ -39,17 +39,17 @@ class UserServiceTest {
     private RefreshTokenService refreshTokenService;
 
     private UserService service;
-    private User admin;
-    private User operator;
+    private User owner;
+    private User farmer;
 
     @BeforeEach
     void setUp() {
         service = new UserService(userRepository, passwordEncoder, refreshTokenService);
-        admin = new User("admin", "hash", "Admin", Role.ADMIN);
-        TestFixtures.setId(admin, 1L);
-        operator = TestFixtures.operator(2L, "operator");
-        when(userRepository.findById(1L)).thenReturn(Optional.of(admin));
-        when(userRepository.findById(2L)).thenReturn(Optional.of(operator));
+        owner = new User("pemilik", "hash", "Pemilik", Role.OPERATOR);
+        TestFixtures.setId(owner, 1L);
+        farmer = TestFixtures.operator(2L, "petani");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(owner));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(farmer));
         when(userRepository.save(any(User.class))).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             TestFixtures.setId(u, 9L);
@@ -63,7 +63,7 @@ class UserServiceTest {
     void createEncodesPassword() {
         when(userRepository.existsByUsername("pak.budi")).thenReturn(false);
 
-        UserResponse created = service.create(new UserCreateRequest("pak.budi", "rahasia123", "Budi", Role.VIEWER, null), "admin");
+        UserResponse created = service.create(new UserCreateRequest("pak.budi", "rahasia123", "Budi", Role.VIEWER, null), "pemilik");
 
         assertThat(created.username()).isEqualTo("pak.budi");
         assertThat(created.role()).isEqualTo(Role.VIEWER);
@@ -72,30 +72,47 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("an admin cannot disable or demote their own account")
+    @DisplayName("an operator cannot disable or demote their own account")
     void selfProtection() {
-        assertThatThrownBy(() -> service.update(1L, new UserUpdateRequest(null, null, false), "admin"))
+        assertThatThrownBy(() -> service.update(1L, new UserUpdateRequest(null, null, false), "pemilik"))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("sendiri");
-        assertThatThrownBy(() -> service.update(1L, new UserUpdateRequest(null, Role.OPERATOR, null), "admin"))
+        assertThatThrownBy(() -> service.update(1L, new UserUpdateRequest(null, Role.VIEWER, null), "pemilik"))
                 .isInstanceOf(BusinessRuleException.class);
         verify(refreshTokenService, never()).revokeAllForUser(any());
     }
 
     @Test
-    @DisplayName("the last active admin cannot be demoted by another admin")
-    void lastAdminProtected() {
-        when(userRepository.countByRoleAndEnabledTrue(Role.ADMIN)).thenReturn(1L);
+    @DisplayName("the last active operator cannot be demoted or disabled")
+    void lastOperatorProtected() {
+        when(userRepository.countByRoleAndEnabledTrue(Role.OPERATOR)).thenReturn(1L);
 
-        assertThatThrownBy(() -> service.update(1L, new UserUpdateRequest(null, Role.OPERATOR, null), "other-admin"))
+        assertThatThrownBy(() -> service.update(1L, new UserUpdateRequest(null, Role.VIEWER, null), "other-operator"))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("admin aktif");
+                .hasMessageContaining("operator aktif");
+        assertThatThrownBy(() -> service.update(1L, new UserUpdateRequest(null, null, false), "other-operator"))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("operator aktif");
+    }
+
+    @Test
+    @DisplayName("an operator may disable or demote another operator while one more stays active")
+    void operatorCanManageOtherOperators() {
+        when(userRepository.countByRoleAndEnabledTrue(Role.OPERATOR)).thenReturn(2L);
+
+        UserResponse disabled = service.update(2L, new UserUpdateRequest(null, null, false), "pemilik");
+        assertThat(disabled.enabled()).isFalse();
+
+        farmer.setEnabled(true);
+        UserResponse demoted = service.update(2L, new UserUpdateRequest(null, Role.VIEWER, null), "pemilik");
+        assertThat(demoted.role()).isEqualTo(Role.VIEWER);
     }
 
     @Test
     @DisplayName("disabling or changing a role ends every session of that account")
     void updateRevokesSessions() {
-        UserResponse disabled = service.update(2L, new UserUpdateRequest("Operator Lapangan", null, false), "admin");
+        when(userRepository.countByRoleAndEnabledTrue(Role.OPERATOR)).thenReturn(2L);
+        UserResponse disabled = service.update(2L, new UserUpdateRequest("Operator Lapangan", null, false), "pemilik");
 
         assertThat(disabled.enabled()).isFalse();
         assertThat(disabled.fullName()).isEqualTo("Operator Lapangan");
@@ -105,10 +122,10 @@ class UserServiceTest {
     @Test
     @DisplayName("a password reset flags the account and ends its sessions")
     void resetPassword() {
-        UserResponse reset = service.resetPassword(2L, new ResetPasswordRequest("sementara123"), "admin");
+        UserResponse reset = service.resetPassword(2L, new ResetPasswordRequest("sementara123"), "pemilik");
 
         assertThat(reset.mustChangePassword()).isTrue();
-        assertThat(operator.getPasswordHash()).isEqualTo("$2a$encoded");
+        assertThat(farmer.getPasswordHash()).isEqualTo("$2a$encoded");
         verify(refreshTokenService).revokeAllForUser(2L);
     }
 }

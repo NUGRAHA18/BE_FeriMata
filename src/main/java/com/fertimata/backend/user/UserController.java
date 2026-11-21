@@ -20,12 +20,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Semua endpoint di sini hanya untuk ADMIN (ditegakkan juga di SecurityConfig). */
+/** Semua endpoint di sini hanya untuk OPERATOR (ditegakkan juga di SecurityConfig). */
 @RestController
 @RequestMapping("/api/users")
-@Tag(name = "Users", description = "Account management (ADMIN only)")
+@Tag(name = "Users", description = "Account management (OPERATOR only)")
 @SecurityRequirement(name = "bearerAuth")
-@PreAuthorize("hasRole('" + Role.Names.ADMIN + "')")
+@PreAuthorize("hasRole('" + Role.Names.OPERATOR + "')")
 public class UserController {
 
     private final UserService userService;

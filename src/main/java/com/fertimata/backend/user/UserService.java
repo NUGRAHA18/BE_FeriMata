@@ -14,8 +14,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Pengelolaan akun oleh ADMIN. Pagar anti-terkunci: akun sendiri tidak bisa dinonaktifkan/diturunkan,
- * dan ADMIN aktif terakhir tidak boleh hilang. */
+/** Pengelolaan akun oleh OPERATOR. Pagar anti-terkunci: akun sendiri tidak bisa dinonaktifkan/diturunkan,
+ * dan OPERATOR aktif terakhir tidak boleh hilang. Operator boleh mereset dan menonaktifkan operator lain. */
 @Service
 public class UserService {
 
@@ -68,8 +68,8 @@ public class UserService {
             if (self) {
                 throw new BusinessRuleException("Anda tidak bisa mengubah peran akun Anda sendiri");
             }
-            if (user.getRole() == Role.ADMIN) {
-                ensureAnotherActiveAdmin(user);
+            if (user.getRole() == Role.OPERATOR) {
+                ensureAnotherActiveOperator(user);
             }
             user.setRole(request.role());
             sessionsInvalid = true;
@@ -78,8 +78,8 @@ public class UserService {
             if (self) {
                 throw new BusinessRuleException("Anda tidak bisa menonaktifkan akun Anda sendiri");
             }
-            if (!request.enabled() && user.getRole() == Role.ADMIN) {
-                ensureAnotherActiveAdmin(user);
+            if (!request.enabled() && user.getRole() == Role.OPERATOR) {
+                ensureAnotherActiveOperator(user);
             }
             user.setEnabled(request.enabled());
             sessionsInvalid = sessionsInvalid || !request.enabled();
@@ -91,7 +91,7 @@ public class UserService {
         return UserResponse.from(user);
     }
 
-    /** Reset sandi oleh admin: pengguna harus menggantinya saat masuk, dan semua sesinya berakhir. */
+    /** Reset sandi oleh operator: pengguna harus menggantinya saat masuk, dan semua sesinya berakhir. */
     @Transactional
     public UserResponse resetPassword(Long id, ResetPasswordRequest request, String actor) {
         User user = require(id);
@@ -102,10 +102,10 @@ public class UserService {
         return UserResponse.from(user);
     }
 
-    private void ensureAnotherActiveAdmin(User besides) {
-        long others = userRepository.countByRoleAndEnabledTrue(Role.ADMIN) - (besides.isEnabled() ? 1 : 0);
+    private void ensureAnotherActiveOperator(User besides) {
+        long others = userRepository.countByRoleAndEnabledTrue(Role.OPERATOR) - (besides.isEnabled() ? 1 : 0);
         if (others <= 0) {
-            throw new BusinessRuleException("Harus ada minimal satu admin aktif lain sebelum mengubah akun ini");
+            throw new BusinessRuleException("Harus ada minimal satu operator aktif lain sebelum mengubah akun ini");
         }
     }
 

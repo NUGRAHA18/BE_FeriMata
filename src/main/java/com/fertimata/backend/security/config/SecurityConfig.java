@@ -86,9 +86,9 @@ public class SecurityConfig {
                     // Langganan notifikasi hanya menyangkut HP si pengguna, bukan data kebun; VIEWER juga
                     // perlu peringatan darurat.
                     requests.requestMatchers("/api/push/**").authenticated();
-                    // Kelola akun hanya ADMIN.
-                    requests.requestMatchers("/api/users/**").hasRole(Role.Names.ADMIN);
-                    // VIEWER hanya membaca: setiap permintaan pengubah butuh OPERATOR (ADMIN mewarisi lewat RoleHierarchy);
+                    // Kelola akun: OPERATOR (peran tertinggi).
+                    requests.requestMatchers("/api/users/**").hasRole(Role.Names.OPERATOR);
+                    // VIEWER hanya membaca: setiap permintaan pengubah butuh OPERATOR;
                     // satu aturan di sini lebih aman daripada anotasi di tiap controller.
                     requests.requestMatchers(HttpMethod.POST, "/api/**").hasRole(Role.Names.OPERATOR);
                     requests.requestMatchers(HttpMethod.PUT, "/api/**").hasRole(Role.Names.OPERATOR);
@@ -106,13 +106,11 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /** ADMIN > OPERATOR > VIEWER, dipakai aturan URL dan {@code @PreAuthorize("hasRole(...)")},
-     * sehingga aturan OPERATOR otomatis berlaku untuk ADMIN. */
+    /** OPERATOR > VIEWER, dipakai aturan URL dan {@code @PreAuthorize("hasRole(...)")}:
+     * aturan VIEWER otomatis berlaku untuk OPERATOR. */
     @Bean
     public RoleHierarchy roleHierarchy() {
         return RoleHierarchyImpl.withDefaultRolePrefix()
-                .role(Role.Names.ADMIN)
-                .implies(Role.Names.OPERATOR)
                 .role(Role.Names.OPERATOR)
                 .implies(Role.Names.VIEWER)
                 .build();
