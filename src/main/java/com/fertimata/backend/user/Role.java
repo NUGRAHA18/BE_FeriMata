@@ -4,16 +4,15 @@ import java.util.List;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-/** ADMIN (+ kelola akun) > OPERATOR (kendali alat, data tanaman, peringatan) > VIEWER (hanya baca);
- * hierarki ditegakkan {@code RoleHierarchy} di {@code SecurityConfig}. */
+/** OPERATOR (peran tertinggi: kendali alat, data tanaman, peringatan, dan kelola akun) > VIEWER (hanya baca);
+ * hierarki ditegakkan {@code RoleHierarchy} di {@code SecurityConfig}. Peran ADMIN dihapus (V23): pemakainya
+ * satu-dua petani di kebun yang sama, jadi kelola akun diwariskan ke OPERATOR. */
 public enum Role {
-    ADMIN,
     OPERATOR,
     VIEWER;
 
     /** Role names as used in security expressions, kept in one place to avoid typo-driven bugs. */
     public static final class Names {
-        public static final String ADMIN = "ADMIN";
         public static final String OPERATOR = "OPERATOR";
         public static final String VIEWER = "VIEWER";
 

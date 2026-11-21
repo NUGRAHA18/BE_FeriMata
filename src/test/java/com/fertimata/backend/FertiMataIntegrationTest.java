@@ -87,7 +87,7 @@ class FertiMataIntegrationTest {
         mockMvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("test-operator"))
-                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.role").value("OPERATOR"))
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
     }
 

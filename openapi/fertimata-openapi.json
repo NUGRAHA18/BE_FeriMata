@@ -45,7 +45,7 @@
     },
     {
       "name": "Users",
-      "description": "Account management (ADMIN only)"
+      "description": "Account management (OPERATOR only)"
     },
     {
       "name": "AI service",
@@ -2071,7 +2071,7 @@
           "Users"
         ],
         "summary": "Update name, role or enabled",
-        "description": "You cannot change your own role or disable yourself; the last active admin is protected.",
+        "description": "You cannot change your own role or disable yourself; the last active operator is protected.",
         "operationId": "update",
         "parameters": [
           {
@@ -4021,7 +4021,6 @@
           "role": {
             "type": "string",
             "enum": [
-              "ADMIN",
               "OPERATOR",
               "VIEWER"
             ]
@@ -4056,7 +4055,6 @@
           "role": {
             "type": "string",
             "enum": [
-              "ADMIN",
               "OPERATOR",
               "VIEWER"
             ],
@@ -4067,7 +4065,7 @@
           },
           "mustChangePassword": {
             "type": "boolean",
-            "description": "True after an admin reset or on a new account: the client should ask for a new password"
+            "description": "True after an operator reset or on a new account: the client should ask for a new password"
           },
           "createdAt": {
             "type": "string",
@@ -5437,7 +5435,6 @@
           "role": {
             "type": "string",
             "enum": [
-              "ADMIN",
               "OPERATOR",
               "VIEWER"
             ]
